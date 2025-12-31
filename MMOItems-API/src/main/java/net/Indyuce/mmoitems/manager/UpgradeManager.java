@@ -9,6 +9,7 @@ import net.Indyuce.mmoitems.api.upgrade.guarantee.GuaranteeManager;
 import net.Indyuce.mmoitems.api.upgrade.limit.DailyLimitManager;
 import net.Indyuce.mmoitems.api.upgrade.log.UpgradeLogManager;
 import net.Indyuce.mmoitems.api.upgrade.penalty.GlobalPenaltyConfig;
+import net.Indyuce.mmoitems.api.upgrade.UpgradeRuntimeSettings;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -56,6 +57,11 @@ public class UpgradeManager implements Reloadable {
 	 * 强化日志管理器
 	 */
 	private UpgradeLogManager logManager;
+
+	/**
+	 * 强化运行期配置缓存（广播、自动绑定等）
+	 */
+	private UpgradeRuntimeSettings runtimeSettings;
 
 	public UpgradeManager() {
 		reload();
@@ -111,6 +117,13 @@ public class UpgradeManager implements Reloadable {
 			logManager = new UpgradeLogManager();
 		} else {
 			logManager.reload();
+		}
+
+		// 初始化或重载运行期配置缓存
+		if (runtimeSettings == null) {
+			runtimeSettings = new UpgradeRuntimeSettings();
+		} else {
+			runtimeSettings.reload();
 		}
 	}
 
@@ -192,5 +205,15 @@ public class UpgradeManager implements Reloadable {
 	@NotNull
 	public UpgradeLogManager getLogManager() {
 		return logManager;
+	}
+
+	/**
+	 * 获取强化运行期配置缓存
+	 *
+	 * @return 运行期配置
+	 */
+	@NotNull
+	public UpgradeRuntimeSettings getRuntimeSettings() {
+		return runtimeSettings;
 	}
 }
