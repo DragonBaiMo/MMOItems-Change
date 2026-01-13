@@ -6,6 +6,7 @@ import io.lumine.mythic.lib.damage.DamageType;
 import io.lumine.mythic.lib.version.Sounds;
 import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.api.interaction.util.DurabilityItem;
+import net.Indyuce.mmoitems.api.interaction.util.DurabilityResult;
 import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -39,7 +40,7 @@ public class DurabilityListener implements Listener {
         event.setDamage(capDurabilityLoss(event.getDamage()));
 
         item.onDurabilityDecrease(event.getDamage()); // Calculate item durability loss
-        item.updateInInventory(event); // Update item
+        item.updateInInventory(event); // Update item - this overload is fine, it uses event.setDamage()
     }
 
     private static final List<DamageCause> IGNORED_CAUSES = Arrays.asList(DamageCause.DROWNING, DamageCause.SUICIDE, DamageCause.FALL, DamageCause.VOID,
@@ -112,12 +113,19 @@ public class DurabilityListener implements Listener {
             return;
 
         final Player player = event.getAttacker().getPlayer();
-        final DurabilityItem durabilityItem = DurabilityItem.custom(player, EquipmentSlot.HAND, player.getInventory().getItemInMainHand());
+        final EquipmentSlot slot = EquipmentSlot.HAND;
+        final DurabilityItem durabilityItem = DurabilityItem.custom(player, slot, player.getInventory().getItemInMainHand());
         if (durabilityItem == null) return;
 
         durabilityItem.decreaseDurability(capDurabilityLoss(1));
-        if (durabilityItem.updateInInventory().toItem() == null) {
+
+        // Use new buildResult() API to get the result and apply it correctly
+        DurabilityResult result = durabilityItem.buildResult();
+        if (result.isBroken()) {
+            player.getInventory().setItem(slot, null);
             player.getWorld().playSound(player.getLocation(), Sounds.ENTITY_ITEM_BREAK, 1, 1);
+        } else {
+            result.applyToInventory(player, slot);
         }
     }
 
@@ -130,11 +138,19 @@ public class DurabilityListener implements Listener {
         // Useless repair amount
         if (event.getRepairAmount() <= 0) return;
 
-        DurabilityItem durItem = DurabilityItem.custom(null, event.getItem());
+        // Get the player and slot from the event
+        final Player player = event.getPlayer();
+        final EquipmentSlot slot = event.getSlot();
+
+        // Use the slot from the event to properly update the item
+        DurabilityItem durItem = DurabilityItem.custom(player, slot, event.getItem());
         if (durItem != null) {
             event.setCancelled(true); // Cancel event
             durItem.addDurability(event.getRepairAmount()); // Mend
-            durItem.updateInInventory(); // Update inventory
+
+            // Use new buildResult() API to properly update the item
+            DurabilityResult result = durItem.buildResult();
+            result.applyToInventory(player, slot);
         }
     }
 
@@ -151,10 +167,14 @@ public class DurabilityListener implements Listener {
         damage = capDurabilityLoss(damage); // Cap durability loss
         item.decreaseDurability(damage);
 
-        if (item.updateInInventory().toItem() == null) {
+        // Use new buildResult() API to get the result and apply it correctly
+        DurabilityResult result = item.buildResult();
+        if (result.isBroken()) {
+            player.getInventory().setItem(slot, null);
             // Play break sound
             player.getWorld().playSound(player.getLocation(), Sounds.ENTITY_ITEM_BREAK, 1, 1);
+        } else {
+            result.applyToInventory(player, slot);
         }
-
     }
 }

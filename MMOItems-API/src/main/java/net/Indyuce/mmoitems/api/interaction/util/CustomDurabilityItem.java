@@ -67,6 +67,11 @@ public class CustomDurabilityItem extends DurabilityItem {
         return durability;
     }
 
+    @Override
+    public int getInitialDurability() {
+        return initialDurability;
+    }
+
     public boolean isBarHidden() {
         return barHidden;
     }

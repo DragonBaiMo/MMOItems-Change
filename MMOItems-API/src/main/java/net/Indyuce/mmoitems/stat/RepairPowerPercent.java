@@ -26,9 +26,20 @@ public class RepairPowerPercent extends DoubleStat implements ConsumableItemInte
         if (repairPower <= 0)
             return false;
 
-        return RepairPower.handleRepair(playerData, consumable, target, durItem -> {
+        RepairPower.RepairResult result = RepairPower.handleRepair(playerData, consumable, target, durItem -> {
+            // For vanilla items, use the item's max durability from Material
+            if (durItem == null) {
+                int vanillaMaxDurability = target.getItem().getType().getMaxDurability();
+                return (int) (repairPower * vanillaMaxDurability / 100);
+            }
             final double maxDurability = durItem.getMaxDurability();
             return (int) (repairPower * maxDurability / 100);
         });
+
+        // Use event.setCurrentItem() to correctly update the item in inventory
+        if (result.success && result.repairedItem != null) {
+            event.setCurrentItem(result.repairedItem);
+        }
+        return result.success;
     }
 }

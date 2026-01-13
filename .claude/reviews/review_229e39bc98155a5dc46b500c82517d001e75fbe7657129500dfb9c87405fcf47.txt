@@ -1,0 +1,38 @@
+# 变更摘要：重构耐久度系统，引入 `DurabilityResult` 以替代过时的 `toItem`/`updateInInventory`，并修复了部分命令和监听器逻辑。
+
+## 文件：MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/RepairPowerPercent.java
+### L29：[HIGH] Vanilla 物品按百分比修复逻辑失效
+**问题**：当 `durItem` 为 `null`（即 Vanilla 物品）时，lambda 表达式直接返回 `0`。这会导致 `RepairUtils.repairVanillaItem` 接收到的修复量为 0，实际上禁用了 Vanilla 物品的百分比修复功能（回归缺陷）。
+**建议**：应使用 `target`（NBTItem）获取原版物品的最大耐久度进行计算。
+
+```diff
+-        if (durItem == null) return 0;
++        if (durItem == null) return (int) (repairPower * target.getItem().getType().getMaxDurability() / 100);
+         final double maxDurability = durItem.getMaxDurability();
+         return (int) (repairPower * maxDurability / 100);
+```
+
+## 文件：MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/interaction/util/CustomDurabilityItem.java
+### L98：[MEDIUM] buildResult() 中潜在的 NPE
+**问题**：在 `isLostWhenBroken()` 分支中，直接调用了 `EquipmentSlot.fromBukkit(slot)`。虽然 `player` 不为 null，但 `DurabilityItem` 的 `slot` 字段可能为 `null`（例如通过某些构造函数创建时）。如果 `slot` 为 null，`fromBukkit` 或后续调用可能会抛出空指针异常。
+**建议**：在调用依赖 slot 的逻辑前，增加非空检查。
+
+```diff
+         // 损坏后丢失
+         if (isLostWhenBroken()) {
+             // 播放破碎音效
+-            if (player != null) {
++            if (player != null && slot != null) {
+                 if (item.getType().getMaxDurability() == 0) {
+                     player.getWorld().playSound(player.getLocation(), Sounds.ENTITY_ITEM_BREAK, 1, 1);
+                 }
+                 PlayerData.get(player).getInventory().watchVanillaSlot(
+                         io.lumine.mythic.lib.api.player.EquipmentSlot.fromBukkit(slot), Optional.empty());
+             }
+             return new DurabilityResult.Broken(initialDur);
+         }
+```
+
+## 其他说明
+*   **重构确认**：`RepairPower` 和 `DurabilityListener` 中对 `buildResult()` 的采用看起来是正确的，能够更明确地处理物品更新、损坏和降级状态。
+*   **兼容性**：保留了 `@Deprecated` 的 `toItem()` 和 `updateInInventory()` 方法，这对于维持 API 兼容性是良好的做法。

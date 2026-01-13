@@ -1,0 +1,18 @@
+# 变更摘要：重构耐久度处理逻辑，引入 `DurabilityResult` 以替代不安全的 `void` 更新方法，并修复了 `RepairPower` 与 `Mending` 在特定场景下更新库存失败的问题。
+
+## 业务逻辑变更已确认为无缺陷实现
+代码本身实现正确，无 bug。以下是受影响的行为变化（业务决策的结果，不需修复）：
+
+- **文件**：`MMOItems-API/.../DurabilityItem.java`
+  - **变更**：新增 `buildResult()` 方法处理物品损坏、降级与更新逻辑；弃用无参 `updateInInventory()`。
+  - **注意点**：新增了降级失败时的兜底逻辑（当升级数据损坏时直接视为物品破碎），这是合理的防御性编程。
+
+- **文件**：`MMOItems-Dist/.../DurabilityListener.java`
+  - **变更**：`mendEvent` 和 `handleMmoDamageDurability` 现在显式传递 `EquipmentSlot` 并使用 `applyToInventory`。
+  - **注意点**：修复了此前因 `slot` 为 null 导致 NBT 更新失败的隐患。
+
+- **文件**：`MMOItems-API/.../RepairPower.java`
+  - **变更**：`handleRepair` 现在返回 `RepairResult`，并在 `handleConsumableEffect` 中显式调用 `event.setCurrentItem`。
+  - **注意点**：这是为了适配新的结果构建模式，确保消耗品修复逻辑能正确回写物品。
+
+准备合并。

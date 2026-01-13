@@ -73,6 +73,11 @@ public class VanillaDurabilityItem extends DurabilityItem {
     }
 
     @Override
+    public int getInitialDurability() {
+        return maxDamage - initialDamage;
+    }
+
+    @Override
     public int getMaxDurability() {
         return maxDamage;
     }
