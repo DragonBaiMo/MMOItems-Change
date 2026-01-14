@@ -20,3 +20,8 @@ dependency-reduced-pom.xml
 
 local_install.bat
 local_install.sh
+
+EraUpgrade（元年强化）插件策划案v1.1.md
+UPGRADE_COMMAND_GUIDE.md
+UPGRADE_EXTENSION_GUIDE.md
+UPGRADE_PENALTY_DESIGN.md
