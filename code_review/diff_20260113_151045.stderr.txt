@@ -1,0 +1,1 @@
+warning: in the working copy of 'MMOItems-Dist/src/main/resources/default/language/Chinese Simplified/messages.yml', LF will be replaced by CRLF the next time Git touches it

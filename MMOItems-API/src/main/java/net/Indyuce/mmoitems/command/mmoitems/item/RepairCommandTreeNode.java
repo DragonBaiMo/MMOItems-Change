@@ -1,12 +1,10 @@
 package net.Indyuce.mmoitems.command.mmoitems.item;
 
-import io.lumine.mythic.lib.api.item.NBTItem;
 import io.lumine.mythic.lib.command.CommandTreeExplorer;
 import io.lumine.mythic.lib.command.CommandTreeNode;
-import net.Indyuce.mmoitems.ItemStats;
-import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.api.interaction.util.DurabilityItem;
 import net.Indyuce.mmoitems.api.interaction.util.DurabilityResult;
+import net.Indyuce.mmoitems.api.util.message.Message;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
@@ -41,20 +39,20 @@ public class RepairCommandTreeNode extends CommandTreeNode {
 
         // Check if item is empty
         if (stack == null || stack.getType() == Material.AIR) {
-            sender.sendMessage(MMOItems.plugin.getPrefix() + "You are not holding any item.");
+            Message.REPAIR_CMD_NO_ITEM.format(ChatColor.RED).send(player);
             return CommandResult.FAILURE;
         }
 
         // Get DurabilityItem directly to handle repair
         DurabilityItem durItem = DurabilityItem.from(player, stack, slot);
         if (durItem == null) {
-            sender.sendMessage(MMOItems.plugin.getPrefix() + "The item you are holding can't be repaired.");
+            Message.REPAIR_CMD_NOT_REPAIRABLE.format(ChatColor.RED).send(player);
             return CommandResult.FAILURE;
         }
 
         // Check if already at full durability
         if (durItem.getDurability() >= durItem.getMaxDurability()) {
-            sender.sendMessage(MMOItems.plugin.getPrefix() + "The item is already at full durability.");
+            Message.REPAIR_CMD_FULL.format(ChatColor.YELLOW).send(player);
             return CommandResult.SUCCESS;
         }
 
@@ -64,10 +62,10 @@ public class RepairCommandTreeNode extends CommandTreeNode {
 
         if (result.hasItem()) {
             player.getInventory().setItem(slot, result.getItem());
-            sender.sendMessage(MMOItems.plugin.getPrefix() + "Successfully repaired the item you are holding.");
+            Message.REPAIR_CMD_SUCCESS.format(ChatColor.GREEN).send(player);
             return CommandResult.SUCCESS;
         } else {
-            sender.sendMessage(MMOItems.plugin.getPrefix() + "Failed to repair the item.");
+            Message.REPAIR_CMD_FAILED.format(ChatColor.RED).send(player);
             return CommandResult.FAILURE;
         }
     }

@@ -1,0 +1,153 @@
+diff --git a/.claude/reviews/last_pass_hash.txt b/.claude/reviews/last_pass_hash.txt
+index f45e9fc1e..8af27c2f1 100644
+--- a/.claude/reviews/last_pass_hash.txt
++++ b/.claude/reviews/last_pass_hash.txt
+@@ -1 +1 @@
+-18d0d4403b12f42ac00373536a07e61a57f58dde0c184a39d1a75ad8d6327a0e
+\ No newline at end of file
++10e85048eec73f671a09ed1e087b38a4847e296ff6801884a399d5e26a0939d4
+\ No newline at end of file
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
+index 8e88bc44a..d19a2fba6 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
+@@ -234,17 +234,17 @@ public class ItemStats {
+             AMPHIBIAN = new Amphibian(),
+ 
+     // Abilities & Upgrading
+     ABILITIES = new Abilities(),
+             UPGRADE = new UpgradeStat(),
+             UPGRADE_PROTECTION = new UpgradeProtectionStat(),
+             DOWNGRADE_ON_BREAK = new BooleanStat("BREAK_DOWNGRADE", Material.DAMAGED_ANVIL, "Downgrade when Broken", new String[]{"If this item's durability reaches 0,", "it will be fully repaired but also", "downgraded by one level.", "", "&cIt will only break if it cannot be", "&cdowngraded further", "", "Requires to define an &6Upgrade Template", "Required to define &6Custom Durability"}, new String[]{"equipment"}),
+             DOWNGRADE_ON_DEATH = new BooleanStat("DEATH_DOWNGRADE", Material.DAMAGED_ANVIL, "Downgrade on Death", new String[]{"If the wearer of this item dies, it may", "downgrade (based on &6Death Downgrade", "&6Chance &7stat)", "", "Required to define an &6Upgrade Template", "Requires keep-inventory gamerule. "}, new String[]{"equipment"}),
+-            DOWNGRADE_ON_DEATH_CHANCE = new DoubleStat("DEATH_DOWNGRADE_CHANCE", Material.SKELETON_SKULL, "Death Downgrade Chance", new String[]{"Probability that an item with &cDowngrade ", "&con Death&7 will be downgraded when the", "player dies. ", "", "Exceeding 100% will for sure downgrade", "one item, and roll again to downgrade", "another (with the excess probability).", "&6The same item wont be downgraded twice."}, new String[]{"equipment"}, false),
++            DOWNGRADE_ON_DEATH_CHANCE = new DoubleStat("DEATH_DOWNGRADE_CHANCE", Material.SKELETON_SKULL, "Death Downgrade Chance", new String[]{"Probability that an item with &cDowngrade ", "&con Death&7 will be downgraded when the", "player dies. ", "", "Exceeding 100% will for sure downgrade", "one item, and roll again to downgrade", "another (with the excess probability).", "&6The same item wont be downgraded twice."}, new String[]{"equipment", "gem_stone"}, false),
+ 
+     // Unique Item Stats
+     DYE_COLOR = new DyeColor(),
+             HIDE_DYE = new HideDye(),
+             TRIM_MATERIAL = new TrimMaterialStat(),
+             TRIM_PATTERN = new TrimPatternStat(),
+             HIDE_ARMOR_TRIM = new HideTrim(),
+             POTION_EFFECTS = new PotionEffects(),
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/util/message/Message.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/util/message/Message.java
+index a4de12e9a..c204de0af 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/util/message/Message.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/util/message/Message.java
+@@ -34,16 +34,31 @@ public enum Message {
+ 
+     // Consumables & Gem stones
+     CANNOT_IDENTIFY_STACKED_ITEMS("You may only identify one item at a time."),
+     SUCCESSFULLY_IDENTIFIED("You successfully identified &6#item#&e."),
+     SUCCESSFULLY_DECONSTRUCTED("You successfully deconstructed &6#item#&e."),
+     GEM_STONE_APPLIED("You successfully applied &6#gem#&e onto your &6#item#&e."),
+     GEM_STONE_BROKE("Your gem stone &6#gem#&c broke while trying to apply it onto &6#item#&c."),
+     REPAIRED_ITEM("You successfully repaired &6#item#&e for &6#amount# &euses."),
++
++    // Durability / Repair messages
++    REPAIR_CMD_SUCCESS("Successfully repaired the item you are holding."),
++    REPAIR_CMD_FULL("The item is already at full durability."),
++    REPAIR_CMD_NOT_REPAIRABLE("The item you are holding can't be repaired."),
++
++    REPAIR_CONSUMABLE_SUCCESS("You successfully repaired &6#item#&e for &6#amount# &euses."),
++    REPAIR_CONSUMABLE_FULL("This item is already at full durability."),
++    REPAIR_CONSUMABLE_NOT_REPAIRABLE("This item can't be repaired."),
++    REPAIR_CONSUMABLE_TYPE_MISMATCH("This item can't be repaired by this consumable!"),
++
++    DURABILITY_BROKEN_KEEP("Your item is broken but remains in your inventory."),
++    DURABILITY_BROKEN_LOST("Your item broke and disappeared."),
++    DURABILITY_DOWNGRADED("Your item was downgraded to level #level# and fully repaired."),
++    MENDING_REPAIRED("Mending restored durability to your item."),
+     SKIN_APPLIED("You successfully applied the skin onto your &6#item#&e!"),
+     SKIN_REMOVED("You successfully removed the skin from your &6#item#&e!"),
+     SKIN_BROKE("Your skin broke while trying to apply it onto your &6#item#&c."),
+     SKIN_REJECTED("A skin has already been applied onto your &6#item#&c!"),
+     SKIN_INCOMPATIBLE("This skin is not compatible with your &6#item#&c!"),
+     RANDOM_UNSOCKET_GEM_TOO_OLD("The gems have bonded strongly with your item. Cannot remove."),
+     RANDOM_UNSOCKET_SUCCESS("&aYou removed &3#gem# &afrom your &6#item#&a!"),
+ 
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/command/mmoitems/item/RepairCommandTreeNode.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/command/mmoitems/item/RepairCommandTreeNode.java
+index bc6c50c80..7304c5cc3 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/command/mmoitems/item/RepairCommandTreeNode.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/command/mmoitems/item/RepairCommandTreeNode.java
+@@ -36,39 +36,39 @@ public class RepairCommandTreeNode extends CommandTreeNode {
+         // Try offhand if mainhand is empty
+         if (stack == null || stack.getType() == Material.AIR) {
+             stack = player.getInventory().getItemInOffHand();
+             slot = EquipmentSlot.OFF_HAND;
+         }
+ 
+         // Check if item is empty
+         if (stack == null || stack.getType() == Material.AIR) {
+-            sender.sendMessage(MMOItems.plugin.getPrefix() + "You are not holding any item.");
++            Message.REPAIR_CMD_NOT_REPAIRABLE.format(ChatColor.RED).send(player);
+             return CommandResult.FAILURE;
+         }
+ 
+         // Get DurabilityItem directly to handle repair
+         DurabilityItem durItem = DurabilityItem.from(player, stack, slot);
+         if (durItem == null) {
+-            sender.sendMessage(MMOItems.plugin.getPrefix() + "The item you are holding can't be repaired.");
++            Message.REPAIR_CMD_NOT_REPAIRABLE.format(ChatColor.RED).send(player);
+             return CommandResult.FAILURE;
+         }
+ 
+         // Check if already at full durability
+         if (durItem.getDurability() >= durItem.getMaxDurability()) {
+-            sender.sendMessage(MMOItems.plugin.getPrefix() + "The item is already at full durability.");
++            Message.REPAIR_CMD_FULL.format(ChatColor.YELLOW).send(player);
+             return CommandResult.SUCCESS;
+         }
+ 
+         // Repair the item
+         durItem.addDurability(durItem.getMaxDurability());
+         DurabilityResult result = durItem.buildResult();
+ 
+         if (result.hasItem()) {
+             player.getInventory().setItem(slot, result.getItem());
+-            sender.sendMessage(MMOItems.plugin.getPrefix() + "Successfully repaired the item you are holding.");
++            Message.REPAIR_CMD_SUCCESS.format(ChatColor.GREEN).send(player);
+             return CommandResult.SUCCESS;
+         } else {
+-            sender.sendMessage(MMOItems.plugin.getPrefix() + "Failed to repair the item.");
++            Message.REPAIR_CMD_NOT_REPAIRABLE.format(ChatColor.RED).send(player);
+             return CommandResult.FAILURE;
+         }
+     }
+ }
+diff --git a/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java b/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
+index c93ccd632..087e6a08f 100644
+--- a/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
++++ b/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
+@@ -277,15 +277,17 @@ public class PlayerListener implements Listener {
+ 
+         DelayedDeathDowngrade(@NotNull PlayerData playerData, @NotNull Player player) {
+             this.player = player;
+             this.playerData = playerData;
+         }
+ 
+         @Override
+         public void run() {
++            // Check if player is still online before downgrading (absorbed from upstream)
++            if (!playerData.isOnline()) return;
+ 
+             // Downgrade player's inventory
+             DeathDowngrading.playerDeathDowngrade(playerData, player);
+         }
+     }
+ }
+ 
+diff --git a/tmpclaude-48ad-cwd b/tmpclaude-48ad-cwd
+deleted file mode 100644
+index 99402dab2..000000000
+--- a/tmpclaude-48ad-cwd
++++ /dev/null
+@@ -1 +0,0 @@
+-/i/CustomBuild/Minecraft/Other/mmoitems-2025-7-13-持续更新
+diff --git a/tmpclaude-f668-cwd b/tmpclaude-f668-cwd
+deleted file mode 100644
+index 99402dab2..000000000
+--- a/tmpclaude-f668-cwd
++++ /dev/null
+@@ -1 +0,0 @@
+-/i/CustomBuild/Minecraft/Other/mmoitems-2025-7-13-持续更新

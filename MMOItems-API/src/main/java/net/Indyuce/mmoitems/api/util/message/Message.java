@@ -32,6 +32,13 @@ public enum Message {
     // ITEM_BROKE("Your #item#&c broke."),
     ZERO_DURABILITY("This item is broken, you first need to repair it.", "item-break"),
 
+    // Repair command
+    REPAIR_CMD_SUCCESS("&aSuccessfully repaired the item you are holding."),
+    REPAIR_CMD_FULL("&eThe item is already at full durability."),
+    REPAIR_CMD_NOT_REPAIRABLE("&cThe item you are holding can't be repaired."),
+    REPAIR_CMD_NO_ITEM("&cYou are not holding any item."),
+    REPAIR_CMD_FAILED("&cFailed to repair the item."),
+
     // Consumables & Gem stones
     CANNOT_IDENTIFY_STACKED_ITEMS("You may only identify one item at a time."),
     SUCCESSFULLY_IDENTIFIED("You successfully identified &6#item#&e."),
@@ -39,6 +46,11 @@ public enum Message {
     GEM_STONE_APPLIED("You successfully applied &6#gem#&e onto your &6#item#&e."),
     GEM_STONE_BROKE("Your gem stone &6#gem#&c broke while trying to apply it onto &6#item#&c."),
     REPAIRED_ITEM("You successfully repaired &6#item#&e for &6#amount# &euses."),
+    REPAIR_CONSUMABLE_FULL("&eThis item is already at full durability."),
+    REPAIR_CONSUMABLE_NOT_REPAIRABLE("&cThis item can't be repaired."),
+    DURABILITY_BROKEN_KEEP("&eYour item is broken but remains in your inventory."),
+    DURABILITY_BROKEN_LOST("&cYour item broke and disappeared."),
+    DURABILITY_DOWNGRADED("&eYour item was downgraded to level &6#level#&e and fully repaired."),
     SKIN_APPLIED("You successfully applied the skin onto your &6#item#&e!"),
     SKIN_REMOVED("You successfully removed the skin from your &6#item#&e!"),
     SKIN_BROKE("Your skin broke while trying to apply it onto your &6#item#&c."),

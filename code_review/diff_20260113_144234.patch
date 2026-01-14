@@ -1,0 +1,59 @@
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
+index 8e88bc44a..d19a2fba6 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/ItemStats.java
+@@ -234,17 +234,17 @@ public class ItemStats {
+             AMPHIBIAN = new Amphibian(),
+ 
+     // Abilities & Upgrading
+     ABILITIES = new Abilities(),
+             UPGRADE = new UpgradeStat(),
+             UPGRADE_PROTECTION = new UpgradeProtectionStat(),
+             DOWNGRADE_ON_BREAK = new BooleanStat("BREAK_DOWNGRADE", Material.DAMAGED_ANVIL, "Downgrade when Broken", new String[]{"If this item's durability reaches 0,", "it will be fully repaired but also", "downgraded by one level.", "", "&cIt will only break if it cannot be", "&cdowngraded further", "", "Requires to define an &6Upgrade Template", "Required to define &6Custom Durability"}, new String[]{"equipment"}),
+             DOWNGRADE_ON_DEATH = new BooleanStat("DEATH_DOWNGRADE", Material.DAMAGED_ANVIL, "Downgrade on Death", new String[]{"If the wearer of this item dies, it may", "downgrade (based on &6Death Downgrade", "&6Chance &7stat)", "", "Required to define an &6Upgrade Template", "Requires keep-inventory gamerule. "}, new String[]{"equipment"}),
+-            DOWNGRADE_ON_DEATH_CHANCE = new DoubleStat("DEATH_DOWNGRADE_CHANCE", Material.SKELETON_SKULL, "Death Downgrade Chance", new String[]{"Probability that an item with &cDowngrade ", "&con Death&7 will be downgraded when the", "player dies. ", "", "Exceeding 100% will for sure downgrade", "one item, and roll again to downgrade", "another (with the excess probability).", "&6The same item wont be downgraded twice."}, new String[]{"equipment"}, false),
++            DOWNGRADE_ON_DEATH_CHANCE = new DoubleStat("DEATH_DOWNGRADE_CHANCE", Material.SKELETON_SKULL, "Death Downgrade Chance", new String[]{"Probability that an item with &cDowngrade ", "&con Death&7 will be downgraded when the", "player dies. ", "", "Exceeding 100% will for sure downgrade", "one item, and roll again to downgrade", "another (with the excess probability).", "&6The same item wont be downgraded twice."}, new String[]{"equipment", "gem_stone"}, false),
+ 
+     // Unique Item Stats
+     DYE_COLOR = new DyeColor(),
+             HIDE_DYE = new HideDye(),
+             TRIM_MATERIAL = new TrimMaterialStat(),
+             TRIM_PATTERN = new TrimPatternStat(),
+             HIDE_ARMOR_TRIM = new HideTrim(),
+             POTION_EFFECTS = new PotionEffects(),
+diff --git a/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java b/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
+index c93ccd632..087e6a08f 100644
+--- a/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
++++ b/MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/PlayerListener.java
+@@ -277,15 +277,17 @@ public class PlayerListener implements Listener {
+ 
+         DelayedDeathDowngrade(@NotNull PlayerData playerData, @NotNull Player player) {
+             this.player = player;
+             this.playerData = playerData;
+         }
+ 
+         @Override
+         public void run() {
++            // Check if player is still online before downgrading (absorbed from upstream)
++            if (!playerData.isOnline()) return;
+ 
+             // Downgrade player's inventory
+             DeathDowngrading.playerDeathDowngrade(playerData, player);
+         }
+     }
+ }
+ 
+diff --git a/tmpclaude-48ad-cwd b/tmpclaude-48ad-cwd
+deleted file mode 100644
+index 99402dab2..000000000
+--- a/tmpclaude-48ad-cwd
++++ /dev/null
+@@ -1 +0,0 @@
+-/i/CustomBuild/Minecraft/Other/mmoitems-2025-7-13-持续更新
+diff --git a/tmpclaude-f668-cwd b/tmpclaude-f668-cwd
+deleted file mode 100644
+index 99402dab2..000000000
+--- a/tmpclaude-f668-cwd
++++ /dev/null
+@@ -1 +0,0 @@
+-/i/CustomBuild/Minecraft/Other/mmoitems-2025-7-13-持续更新

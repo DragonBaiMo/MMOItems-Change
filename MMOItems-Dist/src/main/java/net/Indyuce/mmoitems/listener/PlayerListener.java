@@ -282,6 +282,8 @@ public class PlayerListener implements Listener {
 
         @Override
         public void run() {
+            // Check if player is still online before downgrading (absorbed from upstream)
+            if (!playerData.isOnline()) return;
 
             // Downgrade player's inventory
             DeathDowngrading.playerDeathDowngrade(playerData, player);
