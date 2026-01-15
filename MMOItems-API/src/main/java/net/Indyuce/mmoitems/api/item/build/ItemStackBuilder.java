@@ -292,7 +292,12 @@ public class ItemStackBuilder {
          * This tag is added to entirely override default vanilla item attribute
          * modifiers, this way armor gives no ARMOR or ARMOR TOUGHNESS to the holder.
          * Since 4.7 attributes are handled via custom calculations
+         *
+         * Fix: Remove by modifier instance first to handle cases where the modifier
+         * was restored from Data Components (prevents "Modifier is already applied" error)
          */
+        meta.removeAttributeModifier(Attributes.ATTACK_SPEED);
+        meta.removeAttributeModifier(Attributes.ATTACK_SPEED, FAKE_MODIFIER);
         meta.addAttributeModifier(Attributes.ATTACK_SPEED, FAKE_MODIFIER);
 
         item.setItemMeta(meta);
@@ -329,3 +334,4 @@ public class ItemStackBuilder {
         return buildNBT(forDisplay).toItem();
     }
 }
+

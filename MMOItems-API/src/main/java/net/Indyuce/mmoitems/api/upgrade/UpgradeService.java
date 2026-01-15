@@ -582,7 +582,9 @@ public class UpgradeService {
                             // 如果有 ItemStack，更新它
                             if (targetItemStack != null) {
                                 NBTItem result = targetMMO.newBuilder().buildNBT();
-                                targetItemStack.setItemMeta(result.toItem().getItemMeta());
+                                ItemStack built = result.toItem();
+                                targetItemStack.setType(built.getType());
+                                targetItemStack.setItemMeta(built.getItemMeta());
                             }
                         }
                         Message.UPGRADE_FAIL_DOWNGRADE.format(ChatColor.RED, "#item#", itemName,
@@ -651,7 +653,10 @@ public class UpgradeService {
     public static void updateMainHandItem(@NotNull Player player, @NotNull MMOItem upgradedMMO) {
         NBTItem result = upgradedMMO.newBuilder().buildNBT();
         ItemStack mainHand = player.getInventory().getItemInMainHand();
-        mainHand.setItemMeta(result.toItem().getItemMeta());
+        ItemStack built = result.toItem();
+        mainHand.setType(built.getType());
+        mainHand.setItemMeta(built.getItemMeta());
+        player.updateInventory();
     }
 
     /**

@@ -1,0 +1,4 @@
+warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/item/build/ItemStackBuilder.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/UpgradeService.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/transfer/UpgradeTransferService.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationGUI.java', LF will be replaced by CRLF the next time Git touches it

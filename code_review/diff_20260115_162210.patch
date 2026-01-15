@@ -1,0 +1,210 @@
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/item/build/ItemStackBuilder.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/item/build/ItemStackBuilder.java
+index 65a803711..1c048a176 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/item/build/ItemStackBuilder.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/item/build/ItemStackBuilder.java
+@@ -1,9 +1,9 @@
+-package net.Indyuce.mmoitems.api.item.build;
++﻿package net.Indyuce.mmoitems.api.item.build;
+ 
+ import io.lumine.mythic.lib.MythicLib;
+ import io.lumine.mythic.lib.api.item.ItemTag;
+ import io.lumine.mythic.lib.api.item.NBTItem;
+ import io.lumine.mythic.lib.gson.JsonArray;
+ import io.lumine.mythic.lib.util.AdventureUtils;
+ import io.lumine.mythic.lib.version.Attributes;
+ import io.lumine.mythic.lib.version.VersionUtils;
+@@ -288,16 +288,17 @@ public class ItemStackBuilder {
+         event.getParsedLore().forEach(array::add);
+         if (!array.isEmpty()) tags.add(new ItemTag("MMOITEMS_DYNAMIC_LORE", array.toString()));
+ 
+         /*
+          * This tag is added to entirely override default vanilla item attribute
+          * modifiers, this way armor gives no ARMOR or ARMOR TOUGHNESS to the holder.
+          * Since 4.7 attributes are handled via custom calculations
+          */
++        meta.removeAttributeModifier(Attributes.ATTACK_SPEED);
+         meta.addAttributeModifier(Attributes.ATTACK_SPEED, FAKE_MODIFIER);
+ 
+         item.setItemMeta(meta);
+ 
+         if (futureActionsItemstack != null) futureActionsItemstack.forEach(a -> a.accept(item));
+ 
+         NBTItem nbt = NBTItem.get(item).addTag(tags);
+         if (futureActions != null) futureActions.forEach(a -> a.accept(nbt));
+@@ -324,8 +325,9 @@ public class ItemStackBuilder {
+ 
+     /**
+      * @return Builds the item
+      */
+     public ItemStack build(boolean forDisplay) {
+         return buildNBT(forDisplay).toItem();
+     }
+ }
++
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/UpgradeService.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/UpgradeService.java
+index 8d16a5a6b..95e7a5ae8 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/UpgradeService.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/UpgradeService.java
+@@ -577,17 +577,19 @@ public class UpgradeService {
+ 
+                     if (actualDowngrade > 0) {
+                         UpgradeTemplate template = targetData.getTemplate();
+                         if (template != null) {
+                             template.upgradeTo(targetMMO, newLevel);
+                             // 如果有 ItemStack，更新它
+                             if (targetItemStack != null) {
+                                 NBTItem result = targetMMO.newBuilder().buildNBT();
+-                                targetItemStack.setItemMeta(result.toItem().getItemMeta());
++                                ItemStack built = result.toItem();
++                                targetItemStack.setType(built.getType());
++                                targetItemStack.setItemMeta(built.getItemMeta());
+                             }
+                         }
+                         Message.UPGRADE_FAIL_DOWNGRADE.format(ChatColor.RED, "#item#", itemName,
+                                 "#amount#", String.valueOf(actualDowngrade)).send(player);
+                         player.playSound(player.getLocation(), Sounds.ENTITY_ITEM_BREAK, 1, 1.5f);
+                         return PenaltyApplicationResult.of(PenaltyResult.DOWNGRADE);
+                     } else {
+                         // 已经在最低等级，无法掉级，但掉级判定已触发，不再继续判定其他惩罚
+@@ -646,17 +648,20 @@ public class UpgradeService {
+      * </p>
+      *
+      * @param player      玩家
+      * @param upgradedMMO 升级后的 MMOItem
+      */
+     public static void updateMainHandItem(@NotNull Player player, @NotNull MMOItem upgradedMMO) {
+         NBTItem result = upgradedMMO.newBuilder().buildNBT();
+         ItemStack mainHand = player.getInventory().getItemInMainHand();
+-        mainHand.setItemMeta(result.toItem().getItemMeta());
++        ItemStack built = result.toItem();
++        mainHand.setType(built.getType());
++        mainHand.setItemMeta(built.getItemMeta());
++        player.updateInventory();
+     }
+ 
+     /**
+      * 如果满足条件，广播强化成功消息
+      * <p>
+      * 根据配置的广播等级列表，当物品达到指定等级时全服通报
+      * </p>
+      *
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/transfer/UpgradeTransferService.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/transfer/UpgradeTransferService.java
+index 7c309cf3a..3ce03437b 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/transfer/UpgradeTransferService.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/upgrade/transfer/UpgradeTransferService.java
+@@ -274,20 +274,24 @@ public class UpgradeTransferService {
+ 
+         // 设置目标物品等级
+         if (newTargetLevel > targetOriginalLevel) {
+             targetTemplate.upgradeTo(targetMMO, newTargetLevel);
+         }
+ 
+         // 10. 更新 ItemStack
+         NBTItem sourceResult = sourceMMO.newBuilder().buildNBT();
+-        sourceItem.setItemMeta(sourceResult.toItem().getItemMeta());
++        ItemStack builtSource = sourceResult.toItem();
++        sourceItem.setType(builtSource.getType());
++        sourceItem.setItemMeta(builtSource.getItemMeta());
+ 
+         NBTItem targetResult = targetMMO.newBuilder().buildNBT();
+-        targetItem.setItemMeta(targetResult.toItem().getItemMeta());
++        ItemStack builtTarget = targetResult.toItem();
++        targetItem.setType(builtTarget.getType());
++        targetItem.setItemMeta(builtTarget.getItemMeta());
+ 
+         return TransferResult.success(sourceLevel, targetOriginalLevel, newTargetLevel, sourceMMO, targetMMO);
+     }
+ 
+     /**
+      * 检查两个物品类型是否兼容（可以转移）
+      * <p>
+      * 根据配置的转移模式判断：
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationGUI.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationGUI.java
+index 397f18399..10edf5dd5 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationGUI.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationGUI.java
+@@ -829,17 +829,19 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
+                 auxiliaryDirectUpChance > 0 && auxiliaryDirectUpLevels > 0
+         );
+ 
+         // 更新物品
+         if (result.isSuccess()) {
+             MMOItem upgradedItem = result.getUpgradedItem();
+             if (upgradedItem != null) {
+                 NBTItem newNBT = upgradedItem.newBuilder().buildNBT();
+-                targetItem.setItemMeta(newNBT.toItem().getItemMeta());
++                ItemStack built = newNBT.toItem();
++                targetItem.setType(built.getType());
++                targetItem.setItemMeta(built.getItemMeta());
+             }
+             playSound("sounds.upgrade-success");
+             Message.UPGRADE_SUCCESS.format(ChatColor.GREEN, "#item#", MMOUtils.getDisplayName(targetItem)).send(player);
+         } else {
+             playSound("sounds.upgrade-fail");
+             String msg = result.getMessage();
+             if (msg == null || msg.isEmpty()) {
+                 msg = getMessage("upgrade-fail-default", "强化失败");
+diff --git a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java
+index 2335a23bf..01a258675 100644
+--- a/MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java
++++ b/MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java
+@@ -352,16 +352,23 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
+ 				return false;
+ 			}
+ 
+ 			UpgradeItemEvent called = new UpgradeItemEvent(playerData, mmoitem, targetMMO, consumableSharpening, targetSharpening);
+ 			Bukkit.getPluginManager().callEvent(called);
+ 			if (called.isCancelled())
+ 				return false;
+ 
++			// 禁止堆叠升级，要求数量为 1
++			if (event.getCurrentItem().getAmount() > 1) {
++				Message.UPGRADE_FAIL.format(ChatColor.RED, "#item#", MMOUtils.getDisplayName(event.getCurrentItem())).send(player);
++				player.playSound(player.getLocation(), Sounds.ENTITY_VILLAGER_NO, 1, 2);
++				return true;
++			}
++
+ 			// 保存升级前的等级（用于衰减计算和惩罚判定）
+ 			int originalLevel = targetSharpening.getLevel();
+ 
+ 			// 计算实际成功率（消耗品提供基础成功率，目标物品的衰减配置决定如何随等级衰减）
+ 			double actualSuccess = consumableSharpening.getSuccess();
+ 			if (targetSharpening.isDecayEnabled() && targetSharpening.getDecayFactor() < 1.0) {
+ 				actualSuccess *= Math.pow(targetSharpening.getDecayFactor(), originalLevel);
+ 			}
+@@ -403,17 +410,17 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
+ 							int actualDowngrade = originalLevel - newLevel;
+ 
+ 							if (actualDowngrade > 0) {
+ 								// 获取模板并降级
+ 								UpgradeTemplate downgradeTemplate = targetSharpening.getTemplate();
+ 								if (downgradeTemplate != null) {
+ 									downgradeTemplate.upgradeTo(targetMMO, newLevel);
+ 									NBTItem downgradedResult = targetMMO.newBuilder().buildNBT();
+-									event.getCurrentItem().setItemMeta(downgradedResult.toItem().getItemMeta());
++									event.setCurrentItem(downgradedResult.toItem());
+ 								} else {
+ 									// 模板不存在，记录警告
+ 									MMOItems.plugin.getLogger().warning("Upgrade template not found for item " + itemName + ", cannot downgrade.");
+ 								}
+ 								Message.UPGRADE_FAIL_DOWNGRADE.format(ChatColor.RED, "#item#", itemName, "#amount#", String.valueOf(actualDowngrade)).send(player);
+ 								player.playSound(player.getLocation(), Sounds.ENTITY_ITEM_BREAK, 1, 1.5f);
+ 							} else {
+ 								// 已经在最低等级，无法掉级
+@@ -457,15 +464,15 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
+ 			 */
+ 			if (MMOItems.plugin.getLanguage().upgradeRequirementsCheck && !playerData.getRPG().canUse(result, false)) {
+ 				Message.UPGRADE_REQUIREMENT_SAFE_CHECK.format(ChatColor.RED).send(player);
+ 				player.playSound(player.getLocation(), Sounds.ENTITY_VILLAGER_NO, 1, 2);
+ 				return false;
+ 			}
+ 
+ 			Message.UPGRADE_SUCCESS.format(ChatColor.YELLOW, "#item#", MMOUtils.getDisplayName(event.getCurrentItem())).send(player);
+-			event.getCurrentItem().setItemMeta(result.toItem().getItemMeta());
++			event.setCurrentItem(result.toItem());
+ 			player.playSound(player.getLocation(), Sounds.ENTITY_PLAYER_LEVELUP, 1, 2);
+ 			return true;
+ 		}
+ 		return false;
+ 	}
+ }

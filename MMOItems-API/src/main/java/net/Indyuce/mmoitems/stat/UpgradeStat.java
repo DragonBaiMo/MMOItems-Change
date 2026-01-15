@@ -357,6 +357,13 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
 			if (called.isCancelled())
 				return false;
 
+			// 禁止堆叠升级，要求数量为 1
+			if (event.getCurrentItem().getAmount() > 1) {
+				Message.UPGRADE_FAIL.format(ChatColor.RED, "#item#", MMOUtils.getDisplayName(event.getCurrentItem())).send(player);
+				player.playSound(player.getLocation(), Sounds.ENTITY_VILLAGER_NO, 1, 2);
+				return true;
+			}
+
 			// 保存升级前的等级（用于衰减计算和惩罚判定）
 			int originalLevel = targetSharpening.getLevel();
 
@@ -408,7 +415,7 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
 								if (downgradeTemplate != null) {
 									downgradeTemplate.upgradeTo(targetMMO, newLevel);
 									NBTItem downgradedResult = targetMMO.newBuilder().buildNBT();
-									event.getCurrentItem().setItemMeta(downgradedResult.toItem().getItemMeta());
+									event.setCurrentItem(downgradedResult.toItem());
 								} else {
 									// 模板不存在，记录警告
 									MMOItems.plugin.getLogger().warning("Upgrade template not found for item " + itemName + ", cannot downgrade.");
@@ -462,7 +469,7 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
 			}
 
 			Message.UPGRADE_SUCCESS.format(ChatColor.YELLOW, "#item#", MMOUtils.getDisplayName(event.getCurrentItem())).send(player);
-			event.getCurrentItem().setItemMeta(result.toItem().getItemMeta());
+			event.setCurrentItem(result.toItem());
 			player.playSound(player.getLocation(), Sounds.ENTITY_PLAYER_LEVELUP, 1, 2);
 			return true;
 		}

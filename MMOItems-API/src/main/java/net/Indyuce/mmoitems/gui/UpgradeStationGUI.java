@@ -834,7 +834,9 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
             MMOItem upgradedItem = result.getUpgradedItem();
             if (upgradedItem != null) {
                 NBTItem newNBT = upgradedItem.newBuilder().buildNBT();
-                targetItem.setItemMeta(newNBT.toItem().getItemMeta());
+                ItemStack built = newNBT.toItem();
+                targetItem.setType(built.getType());
+                targetItem.setItemMeta(built.getItemMeta());
             }
             playSound("sounds.upgrade-success");
             Message.UPGRADE_SUCCESS.format(ChatColor.GREEN, "#item#", MMOUtils.getDisplayName(targetItem)).send(player);

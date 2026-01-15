@@ -279,10 +279,14 @@ public class UpgradeTransferService {
 
         // 10. 更新 ItemStack
         NBTItem sourceResult = sourceMMO.newBuilder().buildNBT();
-        sourceItem.setItemMeta(sourceResult.toItem().getItemMeta());
+        ItemStack builtSource = sourceResult.toItem();
+        sourceItem.setType(builtSource.getType());
+        sourceItem.setItemMeta(builtSource.getItemMeta());
 
         NBTItem targetResult = targetMMO.newBuilder().buildNBT();
-        targetItem.setItemMeta(targetResult.toItem().getItemMeta());
+        ItemStack builtTarget = targetResult.toItem();
+        targetItem.setType(builtTarget.getType());
+        targetItem.setItemMeta(builtTarget.getItemMeta());
 
         return TransferResult.success(sourceLevel, targetOriginalLevel, newTargetLevel, sourceMMO, targetMMO);
     }
