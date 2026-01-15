@@ -469,8 +469,8 @@
             <groupId>cn.drcomo</groupId>
             <artifactId>DrcomoCoreLib</artifactId>
             <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/libs/DrcomoCoreLib-1.0.jar</systemPath>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <!-- <dependency>
             <groupId>com.mysql</groupId>

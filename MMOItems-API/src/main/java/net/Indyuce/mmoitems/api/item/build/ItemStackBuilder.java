@@ -10,14 +10,12 @@ import io.lumine.mythic.lib.version.VersionUtils;
 import net.Indyuce.mmoitems.ItemStats;
 import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.api.Type;
-import net.Indyuce.mmoitems.api.crafting.ConfigMMOItem;
 import net.Indyuce.mmoitems.api.event.GenerateLoreEvent;
 import net.Indyuce.mmoitems.api.event.ItemBuildEvent;
 import net.Indyuce.mmoitems.api.item.mmoitem.MMOItem;
 import net.Indyuce.mmoitems.api.item.template.MMOItemTemplate;
 import net.Indyuce.mmoitems.item.build.BuildMetadata;
 import net.Indyuce.mmoitems.stat.data.MaterialData;
-import net.Indyuce.mmoitems.stat.data.StringData;
 import net.Indyuce.mmoitems.stat.type.ItemStat;
 import net.Indyuce.mmoitems.stat.type.Previewable;
 import net.Indyuce.mmoitems.stat.type.StatHistory;
@@ -77,10 +75,7 @@ public class ItemStackBuilder {
         this.mmoitem = mmoitem;
 
         // Generates a new ItemStack of the specified material (Specified in the Material stat, or a DIAMOND_SWORD if missing).
-        Material mat = mmoitem.hasData(ItemStats.MATERIAL) ? ((MaterialData) mmoitem.getData(ItemStats.MATERIAL)).getMaterial() : Material.DIAMOND_SWORD;
-        String name = mat.getKey().toString();
-        String components = mmoitem.hasData(ItemStats.DATA_COMPONENTS) ? ((StringData) mmoitem.getData(ItemStats.DATA_COMPONENTS)).getString() : "";
-        item = Bukkit.getItemFactory().createItemStack(name+components);
+        item = new ItemStack(mmoitem.hasData(ItemStats.MATERIAL) ? ((MaterialData) mmoitem.getData(ItemStats.MATERIAL)).getMaterial() : Material.DIAMOND_SWORD);
 
         // Gets a lore builder, which will be used to apply the chosen lore format (Choose with the lore format stat, or the default one if unspecified)
         lore = new LoreBuilder(this);

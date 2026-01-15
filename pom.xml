@@ -89,11 +89,6 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
 
-        <repository>
-            <id>local-libs</id>
-            <url>file://${project.basedir}/libs</url>
-        </repository>
-
     </repositories>
 
     <!-- Deployment -->
