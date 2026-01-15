@@ -29,6 +29,7 @@ public class ItemStats {
             CUSTOM_MODEL_DATA_STRINGS = new CustomModelDataStrings(),
             CUSTOM_MODEL_DATA_FLOATS = new CustomModelDataFloats(),
             MODEL = new ItemModel(),
+            DATA_COMPONENTS = new DataComponentsString(),
             EQUIPPABLE_SLOT = new EquippableSlot(),
             EQUIPPABLE_MODEL = new EquippableModel(),
             MAX_DURABILITY = new MaximumDurability(),

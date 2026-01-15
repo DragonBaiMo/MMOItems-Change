@@ -37,3 +37,4 @@ And then add both `MythicLib-dist` and `MMOItems-API` as dependencies:
     <scope>provided</scope>
 </dependency>
 ```
+
