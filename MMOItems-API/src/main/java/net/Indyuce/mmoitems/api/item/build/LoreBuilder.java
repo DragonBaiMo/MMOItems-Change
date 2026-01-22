@@ -170,6 +170,7 @@ public class LoreBuilder extends Buildable<List<String>> {
          * Loops backwards to remove all unused bars in one iteration only.
          * The backwards loop allows to condense into one full iteration.
          */
+        boolean hasContent = false;
         for (int j = 0; j < lore.size(); ) {
             final int n = lore.size() - j - 1;
             final String line = lore.get(n);
@@ -177,10 +178,30 @@ public class LoreBuilder extends Buildable<List<String>> {
             // Remove unused static lore placeholders
             if (line.startsWith("#")) lore.remove(n);
 
-                // Remove empty stat categories
-            else if (line.startsWith("{bar}") && (j == 0 || getType(n + 1).isBar())) lore.remove(n);
+            // Remove empty stat categories (treat consecutive {bar} as one block)
+            else if (line.startsWith("{bar}")) {
+                int blockStart = n;
+                while (blockStart > 0 && lore.get(blockStart - 1).startsWith("{bar}")) {
+                    blockStart--;
+                }
 
-            else j++;
+                if (!hasContent) {
+                    lore.subList(blockStart, n + 1).clear();
+                } else {
+                    j += n - blockStart + 1;
+                }
+                hasContent = false;
+            }
+
+            else if (line.startsWith("{sbar}")) {
+                hasContent = false;
+                j++;
+            }
+
+            else {
+                hasContent = true;
+                j++;
+            }
         }
 
         // Apply extra lore lines from tooltip
