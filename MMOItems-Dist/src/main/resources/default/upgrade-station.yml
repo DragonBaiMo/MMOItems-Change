@@ -1,6 +1,57 @@
 # ========================================
 #       强化工作台 GUI 配置（新版字符图）
 # ========================================
+#
+# ===== 通用占位符支持 =====
+# 所有 items.* 的 name 和 lore 字段都支持以下占位符：
+#
+# 【成功率相关】
+#   {rate}           - 当前最终成功率%（已计算衰减和加成）
+#   {color}          - 成功率对应颜色码（>=80%绿色，>=50%黄色等）
+#   {base}           - 强化石基础成功率%
+#   {decayed}        - 等级衰减后成功率%
+#   {bonus}          - 幸运石加成百分比
+#
+# 【等级信息】
+#   {level}          - 当前强化等级
+#   {max_level}      - 最大强化等级
+#   {next_level}     - 下一级（当前+1）
+#   {template}       - 强化模板名称
+#   {item_name}      - 物品显示名称
+#
+# 【保底系统】
+#   {guarantee_current}   - 保底计数
+#   {guarantee_max}       - 保底阈值
+#   {guarantee_triggered} - 是否已触发保底（true/false）
+#
+# 【惩罚信息】
+#   {break_chance}     - 碎裂概率%（已计算保护石减免）
+#   {downgrade_chance} - 掉级概率%
+#   {downgrade_amount} - 掉级数量
+#   {destroys_on_fail} - 失败是否销毁（true/false）
+#   {has_penalty}      - 是否有惩罚（true/false）
+#
+# 【辅助石效果】
+#   {protection}     - 保护石减免%
+#   {direct_chance}  - 直达石概率%
+#   {direct_levels}  - 直达石跳跃等级数
+#
+# 【每日限制】
+#   {daily_used}      - 今日已用次数
+#   {daily_max}       - 今日最大次数
+#   {daily_remaining} - 今日剩余次数
+#
+# 【经济消耗】
+#   {cost}        - 格式化后的费用
+#   {cost_raw}    - 原始费用数值
+#   {balance}     - 格式化后的余额
+#   {balance_raw} - 原始余额数值
+#   {can_afford}  - 是否负担得起（true/false）
+#
+# 【玩家信息】
+#   {player}      - 玩家名称
+#
+# ========================================
 
 gui:
   title: "&5&l强化工作台 &8- &7放入物品开始强化"
@@ -87,6 +138,8 @@ items:
     name: "&a&l✦ 点击强化 ✦"
     lore:
       - "&a▶ 执行强化"
+      - "&7当前成功率: {color}{rate}%"
+      - "&7当前等级: &f+{level} &8→ &a+{next_level}"
       - "&e强化有风险，请谨慎"
 
   upgrade-button-disabled:

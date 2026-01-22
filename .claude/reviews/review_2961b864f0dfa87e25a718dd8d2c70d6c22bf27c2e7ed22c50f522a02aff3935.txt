@@ -1,0 +1,7 @@
+# 变更摘要：实现强化跳级/直升满级逻辑，并为强化台 GUI 添加通用占位符支持。
+
+代码审查通过，未发现缺陷。
+
+代码逻辑健壮，`UpgradeStat` 中新增的 `upgradeToMax` 与 `upgradeAmount` 正确处理了最大等级上限（`max > 0`），且 `UpgradeStationDisplay` 的占位符系统包含完善的空值与默认值回退处理。
+
+审查通过。

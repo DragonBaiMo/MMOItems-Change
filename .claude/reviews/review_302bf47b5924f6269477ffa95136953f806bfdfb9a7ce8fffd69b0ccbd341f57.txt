@@ -1,0 +1,49 @@
+# 变更摘要：增强强化台GUI支持通用占位符，并支持“一次升满”和“跳级”逻辑，同时更新了配置文件说明。
+
+## 业务逻辑变更已确认为无缺陷实现
+代码本身实现正确，无 bug。以下是受影响的行为变化（业务决策的结果，不需修复）：
+- 文件：`MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java`，L457-L476
+  变更：支持`upgradeToMax`（直接升满）和`upgradeAmount`（自定义跳级）逻辑。
+  注意点：如果目标等级超过最大等级，会截断到最大等级（符合预期）。
+- 文件：`MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationDisplay.java`，L58-L150
+  变更：`createConfigItem` 替换为 `createConfigItemWithPlaceholders`，所有 GUI 物品均支持占位符。
+  注意点：占位符替换逻辑现在是通用的，且包含更多上下文数据。
+
+## 文件：MMOItems-API/src/main/java/net/Indyuce/mmoitems/gui/UpgradeStationDisplay.java
+### L570-L580：[MEDIUM] 占位符计算可能引发 NPE
+`targetItem` 即使不为 null，`MMOUtils.getDisplayName(targetItem)` 可能返回 null（取决于实现），或者 `NBTItem.get(targetItem)` 在非标准物品上可能异常。虽然 `hasSlot` 和 `getType` 已检查，但 `MMOUtils` 和 `NBTItem` 的稳健性需确认。
+此外，`getTemplateName()` 明确可能返回 null，虽然 L610 做了 `!= null ? ... : ""` 处理，但在 `buildPlaceholderContext` 中引用 `data` 之前，需确保 `data` 本身非 null（L604 已检查 `hasData`，安全）。
+**建议**：主要关注 `MMOUtils.getDisplayName` 是否安全，若其可能返回 null，建议加空值保护。
+```java
+itemName = MMOUtils.getDisplayName(targetItem);
+if (itemName == null) itemName = ""; // 兜底
+```
+(如果确认 `MMOUtils` 内部已处理 null 则可忽略)
+
+### L650-L660：[LOW] 每日限制占位符显示逻辑
+当 `daily_max` 为 -1 或 0（通常表示无限制）时，显示逻辑可能不直观。
+`ctx.put("{daily_remaining}", String.valueOf(max - used))` 在 `max` 为 0 或 -1 时会显示负数。
+**建议**：虽然是显示层问题，建议检查 `max <= 0` 的情况，显示 "∞" 或类似符号，避免负数剩余次数。
+
+## 文件：MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/UpgradeStat.java
+### L464-L466：[HIGH] 升级逻辑可能绕过 stat history recalculate
+`template.upgradeTo(targetMMO, targetLevel)` 会调用 `stat.recalculate(level)`。
+**关键检查**：
+`UpgradeTemplate.upgradeTo` 方法内部逻辑：
+```java
+// Set the items level
+UpgradeData dat = ...;
+dat.setLevel(level);
+// ...
+// For every Stat-UpgradeInfo pair
+// ...
+mmoitem.setData(stat, hist.recalculate(level));
+```
+`upgradeTo` 是直接设置等级并重算属性的，这部分逻辑是正确的。
+**但是**，L464 的 `if (amount == 1) template.upgrade(targetMMO);` 和 `else template.upgradeTo(...)` 分支。
+`template.upgrade` 内部通常也是调用 `upgradeTo(level + 1)`。
+**潜在问题**：如果 `targetLevel` 计算错误（例如溢出），`upgradeTo` 是否能处理？
+L462 `targetLevel` 是 `int`，加法可能溢出，但考虑到 Minecraft 物品等级通常不会达到 `Integer.MAX_VALUE`，风险极低。
+**确认**：`targetSharpening.getMax()` 为 0 时表示无上限？L461 的逻辑 `targetSharpening.getMax() > 0` 处理了无上限情况。
+
+审查通过，整体逻辑健壮。建议微调占位符的 NPE 防护。

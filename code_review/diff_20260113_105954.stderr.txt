@@ -1,6 +1,0 @@
-warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/interaction/util/CustomDurabilityItem.java', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/interaction/util/DurabilityItem.java', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/api/interaction/util/VanillaDurabilityItem.java', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/RepairPower.java', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'MMOItems-API/src/main/java/net/Indyuce/mmoitems/stat/RepairPowerPercent.java', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'MMOItems-Dist/src/main/java/net/Indyuce/mmoitems/listener/DurabilityListener.java', LF will be replaced by CRLF the next time Git touches it

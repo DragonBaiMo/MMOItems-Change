@@ -63,13 +63,13 @@ class UpgradeStationDisplay {
         ItemStack previewItem;
 
         if (targetItem == null || targetItem.getType() == Material.AIR) {
-            previewItem = gui.createConfigItem("items.preview-waiting", Material.ARROW, "&f&l→ 强化 →");
+            previewItem = createConfigItemWithPlaceholders("items.preview-waiting", Material.ARROW, "&f&l→ 强化 →");
         } else {
             VolatileMMOItem mmoItem = new VolatileMMOItem(NBTItem.get(targetItem));
             if (!mmoItem.getNBT().hasType()) {
-                previewItem = createPreviewItem(Material.BARRIER, "&c非MMOItems物品", Arrays.asList("&7该物品不能强化"));
+                previewItem = createConfigItemWithPlaceholders("items.preview-invalid", Material.BARRIER, "&c非MMOItems物品");
             } else if (!mmoItem.hasData(ItemStats.UPGRADE)) {
-                previewItem = createPreviewItem(Material.BARRIER, "&c物品不可强化", Arrays.asList("&7该物品没有配置强化属性"));
+                previewItem = createConfigItemWithPlaceholders("items.preview-not-upgradable", Material.BARRIER, "&c物品不可强化");
             } else {
                 UpgradeData data = (UpgradeData) mmoItem.getData(ItemStats.UPGRADE);
                 previewItem = createDetailedPreview(targetItem, data);
@@ -356,39 +356,33 @@ class UpgradeStationDisplay {
     }
 
     private ItemStack createProgressLabel(double successRate) {
-        ItemStack item = gui.createConfigItem("items.progress-label", Material.EXPERIENCE_BOTTLE, "&f成功率");
+        // 使用通用占位符方法创建进度标签
+        ItemStack item = createConfigItemWithPlaceholders("items.progress-label", Material.EXPERIENCE_BOTTLE, "&f成功率");
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             String colorCode = getSuccessColor(successRate);
-            meta.setDisplayName(gui.color("&f成功率: " + colorCode + String.format("%.1f%%", successRate * 100)));
-
-            double baseSuccess = getBaseSuccessFromStone();
-            double decayedSuccess = getDecayedSuccessRate();
-            double chanceBonus = gui.getAuxiliaryChanceBonus();
-
-            List<String> baseLore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
-            List<String> customLore = formatProgressLore(baseLore, successRate, baseSuccess, decayedSuccess, chanceBonus, colorCode);
-            meta.setLore(customLore);
-            item.setItemMeta(meta);
+            // 标题也支持占位符（已在 createConfigItemWithPlaceholders 中处理）
+            // 如果配置未设置自定义 lore，则使用默认逻辑
+            if (!meta.hasLore() || meta.getLore().isEmpty()) {
+                double baseSuccess = getBaseSuccessFromStone();
+                double decayedSuccess = getDecayedSuccessRate();
+                double chanceBonus = gui.getAuxiliaryChanceBonus();
+                List<String> defaultLore = formatProgressLoreDefault(successRate, baseSuccess, decayedSuccess, chanceBonus, colorCode);
+                meta.setLore(defaultLore);
+                item.setItemMeta(meta);
+            }
         }
         return item;
     }
 
     /**
-     * 允许配置 items.progress-label.lore 使用占位符：
-     * {rate} 当前成功率%（一位小数），{color} 颜色码，
-     * {base} 基础成功率%，{decayed} 衰减后成功率%，{bonus} 幸运石加成%，
-     * {guarantee_current}/{guarantee_max} 保底计数。
-     * 若配置为空，则使用默认拼装逻辑。
+     * 生成进度标签的默认 lore（当配置未设置自定义 lore 时使用）
      */
-    private List<String> formatProgressLore(List<String> configLore,
-                                            double successRate,
-                                            double baseSuccess,
-                                            double decayedSuccess,
-                                            double chanceBonus,
-                                            String colorCode) {
-        // 格式化数值
-        String rateStr = String.format("%.1f", successRate * 100);
+    private List<String> formatProgressLoreDefault(double successRate,
+                                                    double baseSuccess,
+                                                    double decayedSuccess,
+                                                    double chanceBonus,
+                                                    String colorCode) {
         String baseStr = String.format("%.1f", baseSuccess * 100);
         String decayedStr = String.format("%.1f", decayedSuccess * 100);
         String bonusStr = String.format("%.1f", chanceBonus);
@@ -409,25 +403,6 @@ class UpgradeStationDisplay {
             triggered = gm.isGuaranteed(targetItem);
         }
 
-        // 有自定义 lore 时执行占位符替换
-        if (!configLore.isEmpty()) {
-            List<String> filled = new ArrayList<>();
-            for (String line : configLore) {
-                String replaced = line
-                        .replace("{rate}", rateStr)
-                        .replace("{color}", colorCode)
-                        .replace("{base}", baseStr)
-                        .replace("{decayed}", decayedStr)
-                        .replace("{bonus}", bonusStr)
-                        .replace("{guarantee_current}", guaranteeCurrent)
-                        .replace("{guarantee_max}", guaranteeMax);
-                // 如果需要显示“已触发保底”可以在配置中自行写入文本，不强制拼接
-                filled.add(gui.color(replaced));
-            }
-            return filled;
-        }
-
-        // 默认拼装逻辑（原行为）
         List<String> lore = new ArrayList<>();
         lore.add(gui.color("&7"));
         lore.add(gui.color(gui.getMessage("base-rate", "&7基础成功率: &f{rate}%")
@@ -578,14 +553,190 @@ class UpgradeStationDisplay {
         ItemStack button;
 
         if (gui.isProcessing()) {
-            button = gui.createConfigItem("items.upgrade-button-cooldown", Material.GRAY_CONCRETE, "&7&l请稍候...");
+            button = createConfigItemWithPlaceholders("items.upgrade-button-cooldown", Material.GRAY_CONCRETE, "&7&l请稍候...");
         } else if (canUpgrade) {
-            button = gui.createConfigItem("items.upgrade-button-enabled", Material.LIME_CONCRETE, "&a&l? 点击强化 ?");
+            button = createConfigItemWithPlaceholders("items.upgrade-button-enabled", Material.LIME_CONCRETE, "&a&l? 点击强化 ?");
         } else {
             button = createUpgradeButtonDisabled();
         }
 
         gui.setSlotItem(gui.getSlotUpgradeButton(), button);
+    }
+
+    // ===== 通用占位符支持 =====
+
+    /**
+     * 构建当前状态的占位符上下文（缓存计算结果，避免重复计算）
+     */
+    private Map<String, String> buildPlaceholderContext() {
+        Map<String, String> ctx = new LinkedHashMap<>();
+
+        // 成功率相关
+        double successRate = calculateActualSuccessRate();
+        double baseSuccess = getBaseSuccessFromStone();
+        double decayedSuccess = getDecayedSuccessRate();
+        double chanceBonus = gui.getAuxiliaryChanceBonus();
+        double protection = gui.getAuxiliaryProtection();
+        double directChance = gui.getAuxiliaryDirectUpChance();
+        int directLevels = gui.getAuxiliaryDirectUpLevels();
+
+        ctx.put("{rate}", String.format("%.1f", successRate * 100));
+        ctx.put("{color}", getSuccessColor(successRate));
+        ctx.put("{base}", String.format("%.1f", baseSuccess * 100));
+        ctx.put("{decayed}", String.format("%.1f", decayedSuccess * 100));
+        ctx.put("{bonus}", String.format("%.1f", chanceBonus));
+        ctx.put("{protection}", String.format("%.1f", protection));
+        ctx.put("{direct_chance}", String.format("%.1f", directChance));
+        ctx.put("{direct_levels}", String.valueOf(directLevels));
+
+        // 物品等级信息
+        String levelStr = "0";
+        String maxLevelStr = "0";
+        String nextLevelStr = "1";
+        String templateName = "";
+        String itemName = "";
+
+        ItemStack targetItem = gui.getItemAt(gui.getSlotTargetItem());
+        if (targetItem != null && targetItem.getType() != Material.AIR) {
+            itemName = MMOUtils.getDisplayName(targetItem);
+            VolatileMMOItem mmoItem = new VolatileMMOItem(NBTItem.get(targetItem));
+            if (mmoItem.getNBT().hasType() && mmoItem.hasData(ItemStats.UPGRADE)) {
+                UpgradeData data = (UpgradeData) mmoItem.getData(ItemStats.UPGRADE);
+                int level = data.getLevel();
+                int maxLevel = data.getMax();
+                levelStr = String.valueOf(level);
+                maxLevelStr = String.valueOf(maxLevel);
+                nextLevelStr = String.valueOf(level + 1);
+                templateName = data.getTemplateName() != null ? data.getTemplateName() : "";
+
+                // 惩罚信息
+                boolean inBreakRange = data.isInBreakRange(level) && data.getBreakChance() > 0;
+                boolean inDowngradeRange = data.isInDowngradeRange(level) && data.getDowngradeChance() > 0;
+                double breakChance = inBreakRange ? data.getBreakChance() * 100 * (1 - protection / 100.0) : 0;
+                double downgradeChance = inDowngradeRange ? data.getDowngradeChance() * 100 * (1 - protection / 100.0) : 0;
+                int downgradeAmount = data.getDowngradeAmount();
+                boolean destroysOnFail = data.destroysOnFail();
+
+                ctx.put("{break_chance}", String.format("%.1f", breakChance));
+                ctx.put("{downgrade_chance}", String.format("%.1f", downgradeChance));
+                ctx.put("{downgrade_amount}", String.valueOf(downgradeAmount));
+                ctx.put("{destroys_on_fail}", destroysOnFail ? "true" : "false");
+                ctx.put("{has_penalty}", (inBreakRange || inDowngradeRange || destroysOnFail) ? "true" : "false");
+            }
+
+            // 保底数据
+            GuaranteeManager gm = MMOItems.plugin.getUpgrades().getGuaranteeManager();
+            if (gm != null && gm.isEnabled()) {
+                ctx.put("{guarantee_current}", String.valueOf(gm.getConsecutiveFails(targetItem)));
+                ctx.put("{guarantee_max}", String.valueOf(gm.getThreshold()));
+                ctx.put("{guarantee_triggered}", gm.isGuaranteed(targetItem) ? "true" : "false");
+            } else {
+                ctx.put("{guarantee_current}", "0");
+                ctx.put("{guarantee_max}", "0");
+                ctx.put("{guarantee_triggered}", "false");
+            }
+        } else {
+            ctx.put("{guarantee_current}", "0");
+            ctx.put("{guarantee_max}", "0");
+            ctx.put("{guarantee_triggered}", "false");
+            ctx.put("{break_chance}", "0");
+            ctx.put("{downgrade_chance}", "0");
+            ctx.put("{downgrade_amount}", "0");
+            ctx.put("{destroys_on_fail}", "false");
+            ctx.put("{has_penalty}", "false");
+        }
+
+        ctx.put("{level}", levelStr);
+        ctx.put("{max_level}", maxLevelStr);
+        ctx.put("{next_level}", nextLevelStr);
+        ctx.put("{template}", templateName);
+        ctx.put("{item_name}", itemName);
+
+        // 每日限制
+        DailyLimitManager dlm = MMOItems.plugin.getUpgrades().getDailyLimitManager();
+        if (dlm != null && dlm.isEnabled()) {
+            int used = dlm.getUsedAttempts(gui.getPlayer());
+            int max = dlm.getMaxAttempts(gui.getPlayer());
+            ctx.put("{daily_used}", String.valueOf(used));
+            ctx.put("{daily_max}", String.valueOf(max));
+            ctx.put("{daily_remaining}", String.valueOf(max - used));
+        } else {
+            ctx.put("{daily_used}", "0");
+            ctx.put("{daily_max}", "∞");
+            ctx.put("{daily_remaining}", "∞");
+        }
+
+        // 经济消耗
+        UpgradeEconomyHandler economyHandler = MMOItems.plugin.getUpgrades().getEconomyHandler();
+        if (economyHandler != null && economyHandler.isEnabled() && targetItem != null) {
+            VolatileMMOItem mmoItem = new VolatileMMOItem(NBTItem.get(targetItem));
+            if (mmoItem.hasData(ItemStats.UPGRADE)) {
+                UpgradeData data = (UpgradeData) mmoItem.getData(ItemStats.UPGRADE);
+                double cost = economyHandler.getCost(data.getLevel());
+                double balance = economyHandler.getBalance(gui.getPlayer());
+                ctx.put("{cost}", economyHandler.format(cost));
+                ctx.put("{cost_raw}", String.format("%.2f", cost));
+                ctx.put("{balance}", economyHandler.format(balance));
+                ctx.put("{balance_raw}", String.format("%.2f", balance));
+                ctx.put("{can_afford}", balance >= cost ? "true" : "false");
+            }
+        } else {
+            ctx.put("{cost}", "0");
+            ctx.put("{cost_raw}", "0");
+            ctx.put("{balance}", "0");
+            ctx.put("{balance_raw}", "0");
+            ctx.put("{can_afford}", "true");
+        }
+
+        // 玩家信息
+        ctx.put("{player}", gui.getPlayer().getName());
+
+        return ctx;
+    }
+
+    /**
+     * 对物品的 name 和 lore 应用占位符替换
+     * 支持所有内置占位符（见 buildPlaceholderContext）
+     */
+    ItemStack applyPlaceholders(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return item;
+
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return item;
+
+        Map<String, String> ctx = buildPlaceholderContext();
+
+        // 替换 displayName
+        if (meta.hasDisplayName()) {
+            String name = meta.getDisplayName();
+            for (Map.Entry<String, String> e : ctx.entrySet()) {
+                name = name.replace(e.getKey(), e.getValue());
+            }
+            meta.setDisplayName(gui.color(name));
+        }
+
+        // 替换 lore
+        if (meta.hasLore()) {
+            List<String> newLore = new ArrayList<>();
+            for (String line : meta.getLore()) {
+                for (Map.Entry<String, String> e : ctx.entrySet()) {
+                    line = line.replace(e.getKey(), e.getValue());
+                }
+                newLore.add(gui.color(line));
+            }
+            meta.setLore(newLore);
+        }
+
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    /**
+     * 从配置创建物品并自动应用占位符
+     */
+    ItemStack createConfigItemWithPlaceholders(String path, Material defaultMaterial, String defaultName) {
+        ItemStack item = gui.createConfigItem(path, defaultMaterial, defaultName);
+        return applyPlaceholders(item);
     }
 
     private ItemStack createUpgradeButtonDisabled() {

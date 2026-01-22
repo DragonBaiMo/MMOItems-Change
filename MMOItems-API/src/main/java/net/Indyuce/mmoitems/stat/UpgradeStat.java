@@ -454,7 +454,27 @@ public class UpgradeStat extends ItemStat<UpgradeData, UpgradeData> implements C
 			}
 
 			// 强化成功 - 执行升级
-			template.upgrade(targetMMO);
+			if (consumableSharpening.isUpgradeToMax() && targetSharpening.getMax() > 0) {
+				// 一次升满模式：直接升到目标物品的满级
+				template.upgradeTo(targetMMO, targetSharpening.getMax());
+			} else {
+				// 计算目标等级
+				int currentLevel = targetSharpening.getLevel();
+				int amount = consumableSharpening.getUpgradeAmount();
+				int targetLevel = currentLevel + amount;
+
+				// 如果有最大等级限制，不超过最大等级
+				if (targetSharpening.getMax() > 0 && targetLevel > targetSharpening.getMax()) {
+					targetLevel = targetSharpening.getMax();
+				}
+
+				// 执行升级
+				if (amount == 1) {
+					template.upgrade(targetMMO);
+				} else {
+					template.upgradeTo(targetMMO, targetLevel);
+				}
+			}
 			NBTItem result = targetMMO.newBuilder().buildNBT();
 
 			/*

@@ -54,6 +54,12 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 	// ========== 背包强化控制 ==========
 	private final boolean disableBackpack;
 
+	// ========== 一次升满配置 ==========
+	private final boolean upgradeToMax;
+
+	// ========== 跳级配置 ==========
+	private final int upgradeAmount;
+
 	// ========== Getter 方法 ==========
 
 	/**
@@ -151,6 +157,16 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 	public boolean isBackpackDisabled() { return disableBackpack; }
 
 	/**
+	 * @return 是否一次升满
+	 */
+	public boolean isUpgradeToMax() { return upgradeToMax; }
+
+	/**
+	 * @return 每次升级的级数（默认 1）
+	 */
+	public int getUpgradeAmount() { return upgradeAmount; }
+
+	/**
 	 * 创建基础的 UpgradeData（兼容旧版本）
 	 *
 	 * @param reference 强化参考标识
@@ -180,7 +196,7 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 				false, 1.0,
 				-1, -1, 0, 1,
 				-1, -1, 0,
-				null, null, null, false);
+				null, null, null, false, false, 1);
 	}
 
 	/**
@@ -206,12 +222,15 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 	 * @param breakProtectKey 碎裂保护物品标签
 	 * @param destroyProtectKey 销毁保护物品标签
 	 * @param disableBackpack 是否禁用背包强化
+	 * @param upgradeToMax 是否一次升满
+	 * @param upgradeAmount 每次升级的级数（默认 1）
 	 */
 	public UpgradeData(@Nullable String reference, @Nullable String template, boolean workbench, boolean destroy, int max, int min, double success,
 					   boolean decayEnabled, double decayFactor,
 					   int downgradeRangeMin, int downgradeRangeMax, double downgradeChance, int downgradeAmount,
 					   int breakRangeMin, int breakRangeMax, double breakChance,
-					   @Nullable String downgradeProtectKey, @Nullable String breakProtectKey, @Nullable String destroyProtectKey, boolean disableBackpack) {
+					   @Nullable String downgradeProtectKey, @Nullable String breakProtectKey, @Nullable String destroyProtectKey,
+					   boolean disableBackpack, boolean upgradeToMax, int upgradeAmount) {
 		this.reference = reference;
 		this.template = template;
 		this.workbench = workbench;
@@ -232,6 +251,8 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 		this.breakProtectKey = breakProtectKey;
 		this.destroyProtectKey = destroyProtectKey;
 		this.disableBackpack = disableBackpack;
+		this.upgradeToMax = upgradeToMax;
+		this.upgradeAmount = upgradeAmount;
 	}
 
 	/**
@@ -297,6 +318,12 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 
 		// 背包强化控制（默认 false，向后兼容）
 		disableBackpack = section.getBoolean("disable-backpack", false);
+
+		// 一次升满配置（默认 false，向后兼容）
+		upgradeToMax = section.getBoolean("upgrade-to-max", false);
+
+		// 跳级配置（默认 1，向后兼容）
+		upgradeAmount = section.getInt("upgrade-amount", 1);
 	}
 
 	/**
@@ -335,6 +362,12 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 
 		// 背包强化控制（默认 false，向后兼容）
 		disableBackpack = object.has("DisableBackpack") && object.get("DisableBackpack").getAsBoolean();
+
+		// 一次升满配置（默认 false，向后兼容）
+		upgradeToMax = object.has("UpgradeToMax") && object.get("UpgradeToMax").getAsBoolean();
+
+		// 跳级配置（默认 1，向后兼容）
+		upgradeAmount = object.has("UpgradeAmount") ? object.get("UpgradeAmount").getAsInt() : 1;
 	}
 
 	/**
@@ -487,6 +520,14 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 		if (disableBackpack)
 			json.addProperty("DisableBackpack", true);
 
+		// 一次升满配置（仅在启用时序列化）
+		if (upgradeToMax)
+			json.addProperty("UpgradeToMax", true);
+
+		// 跳级配置（仅在非默认值时序列化）
+		if (upgradeAmount != 1)
+			json.addProperty("UpgradeAmount", upgradeAmount);
+
 		return json;
 	}
 
@@ -506,7 +547,7 @@ public class UpgradeData implements StatData, RandomStatData<UpgradeData> {
 				decayEnabled, decayFactor,
 				downgradeRangeMin, downgradeRangeMax, downgradeChance, downgradeAmount,
 				breakRangeMin, breakRangeMax, breakChance,
-				downgradeProtectKey, breakProtectKey, destroyProtectKey, disableBackpack);
+				downgradeProtectKey, breakProtectKey, destroyProtectKey, disableBackpack, upgradeToMax, upgradeAmount);
 		cloned.setLevel(this.level);
 		return cloned;
 	}
