@@ -413,7 +413,6 @@ public class MMOItems extends MMOPlugin {
         return playerDataManager;
     }
 
-    @Override
     @NotNull
     public SynchronizedDataManager<?, ?> getRawPlayerDataManager() {
         return playerDataManager;

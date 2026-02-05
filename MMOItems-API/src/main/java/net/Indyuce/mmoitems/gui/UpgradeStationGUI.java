@@ -12,6 +12,7 @@ import net.Indyuce.mmoitems.api.item.mmoitem.LiveMMOItem;
 import net.Indyuce.mmoitems.api.item.mmoitem.MMOItem;
 import net.Indyuce.mmoitems.api.item.mmoitem.VolatileMMOItem;
 import net.Indyuce.mmoitems.api.upgrade.*;
+import net.Indyuce.mmoitems.api.upgrade.guarantee.GuaranteeManager;
 import net.Indyuce.mmoitems.api.upgrade.limit.DailyLimitManager;
 import net.Indyuce.mmoitems.api.util.message.Message;
 import net.Indyuce.mmoitems.stat.data.UpgradeData;
@@ -761,7 +762,12 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
         LiveMMOItem targetMMO = new LiveMMOItem(targetNBT);
         UpgradeData targetData = (UpgradeData) targetMMO.getData(ItemStats.UPGRADE);
 
-        // 重要：任何“会导致 UpgradeService 直接返回 error 的硬性校验”都必须在消耗材料前完成，避免 GUI 白白扣除材料
+        // 获取强化石的 UpgradeData（用于读取 upgradeAmount、upgradeToMax 等配置）
+        NBTItem stoneNBT = NBTItem.get(stoneItem);
+        VolatileMMOItem stoneMmo = new VolatileMMOItem(stoneNBT);
+        UpgradeData stoneData = stoneMmo.hasData(ItemStats.UPGRADE) ? (UpgradeData) stoneMmo.getData(ItemStats.UPGRADE) : null;
+
+        // 重要：任何"会导致 UpgradeService 直接返回 error 的硬性校验"都必须在消耗材料前完成，避免 GUI 白白扣除材料
         DailyLimitManager dailyLimitManager = MMOItems.plugin.getUpgrades().getDailyLimitManager();
         if (dailyLimitManager != null && dailyLimitManager.isEnabled() && !dailyLimitManager.canUpgrade(player)) {
             int used = dailyLimitManager.getUsedAttempts(player);
@@ -793,10 +799,11 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
                 .targetItem(targetMMO)
                 .targetData(targetData)
                 .targetItemStack(targetItem)
+                .consumableData(stoneData) // 传入强化石的 UpgradeData（用于读取 upgradeAmount、upgradeToMax）
                 .freeMode(true) // 已手动消耗
                 .forceMode(false)
-                // 重要：GUI 模式下已手动消耗强化石，UpgradeService 会将 freeMode 视为“无消耗品=基础成功率100%”。
-                // 为了与背包强化/GUI 展示一致，这里将“强化石的基础成功率”映射到 chanceModifier，从而得到：基础成功率 × 衰减^等级。
+                // 重要：GUI 模式下已手动消耗强化石，UpgradeService 会将 freeMode 视为"无消耗品=基础成功率100%"。
+                // 为了与背包强化/GUI 展示一致，这里将"强化石的基础成功率"映射到 chanceModifier，从而得到：基础成功率 × 衰减^等级。
                 .chanceModifier(stoneBaseSuccess)
                 .auxiliaryChanceBonus(auxiliaryChanceBonus)
                 .auxiliaryProtection(auxiliaryProtection)
@@ -837,6 +844,14 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
                 ItemStack built = newNBT.toItem();
                 targetItem.setType(built.getType());
                 targetItem.setItemMeta(built.getItemMeta());
+
+                // 重要：强制将保底重置写回最终物品，避免 GUI 重建覆盖保底数据
+                GuaranteeManager gm = MMOItems.plugin.getUpgrades().getGuaranteeManager();
+                if (gm != null && gm.isEnabled()) {
+                    NBTItem nbtItem = NBTItem.get(targetItem);
+                    gm.recordSuccess(nbtItem);
+                    targetItem.setItemMeta(nbtItem.toItem().getItemMeta());
+                }
             }
             playSound("sounds.upgrade-success");
             Message.UPGRADE_SUCCESS.format(ChatColor.GREEN, "#item#", MMOUtils.getDisplayName(targetItem)).send(player);

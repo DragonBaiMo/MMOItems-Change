@@ -40,6 +40,13 @@ public class UpgradeContext {
     private final int directLevel;
     private final InventoryClickEvent event;
 
+    // ===== 强化石数据 =====
+    /**
+     * 强化石的 UpgradeData（用于读取 upgradeAmount、upgradeToMax 等配置）
+     */
+    @Nullable
+    private final UpgradeData consumableData;
+
     // ===== 辅料相关字段 =====
     /**
      * 辅料成功率加成（百分比）
@@ -89,6 +96,8 @@ public class UpgradeContext {
         this.forceMode = builder.forceMode;
         this.directLevel = builder.directLevel;
         this.event = builder.event;
+        // 强化石数据
+        this.consumableData = builder.consumableData;
         // 辅料字段
         this.auxiliaryChanceBonus = builder.auxiliaryChanceBonus;
         this.auxiliaryProtection = builder.auxiliaryProtection;
@@ -247,6 +256,19 @@ public class UpgradeContext {
     }
 
     /**
+     * 获取强化石的 UpgradeData
+     * <p>
+     * 用于读取强化石配置的 upgradeAmount、upgradeToMax 等属性
+     * </p>
+     *
+     * @return 强化石的 UpgradeData，如果未设置返回 null
+     */
+    @Nullable
+    public UpgradeData getConsumableData() {
+        return consumableData;
+    }
+
+    /**
      * 计算直达模式需要的强化石数量
      * <p>
      * 数量 = 目标等级 - 当前等级
@@ -343,6 +365,8 @@ public class UpgradeContext {
         private boolean forceMode = false;
         private int directLevel = 0;
         private InventoryClickEvent event;
+        // 强化石数据
+        private UpgradeData consumableData;
         // 辅料字段
         private double auxiliaryChanceBonus = 0;
         private double auxiliaryProtection = 0;
@@ -476,6 +500,20 @@ public class UpgradeContext {
          */
         public Builder event(@Nullable InventoryClickEvent event) {
             this.event = event;
+            return this;
+        }
+
+        /**
+         * 设置强化石的 UpgradeData
+         * <p>
+         * 用于传递强化石配置的 upgradeAmount、upgradeToMax 等属性
+         * </p>
+         *
+         * @param consumableData 强化石的 UpgradeData
+         * @return 构建器实例
+         */
+        public Builder consumableData(@Nullable UpgradeData consumableData) {
+            this.consumableData = consumableData;
             return this;
         }
 

@@ -20,10 +20,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -52,7 +52,7 @@ public class MMOInventoryClickEquipListener implements Listener {
         Inventory clickedInv = event.getClickedInventory();
         if (clickedInv == null) return;
 
-        // 只处理左键点击
+        // 只处理普通左键点击
         if (event.getClick() != ClickType.LEFT) return;
 
         Inventory topInventory = event.getView().getTopInventory();
@@ -66,112 +66,7 @@ public class MMOInventoryClickEquipListener implements Listener {
             return;
         }
 
-        if (event.isCancelled()) return;
-
-        // 只在玩家底部背包触发（避免点箱子等其他界面也触发）
-        if (!clickedInv.equals(event.getView().getBottomInventory())) return;
-
-        // 仅在玩家自己的背包视图中触发（排除箱子、工作台、铁砧等GUI）
-        InventoryType topType = event.getView().getTopInventory().getType();
-        if (topType != InventoryType.CRAFTING && topType != InventoryType.PLAYER) return;
-
-        // 只处理左键单击拾取物品的行为
-        if (event.getAction() != InventoryAction.PICKUP_ALL) return;
-
-        // 鼠标上已有物品时不处理
-        if (!UtilityMethods.isAir(event.getCursor())) return;
-
-        ItemStack clickedItem = event.getCurrentItem();
-        if (UtilityMethods.isAir(clickedItem)) return;
-
-        // MMOInventory 配置：禁止装备叠加物品
-        boolean disableStacked;
-        try {
-            disableStacked = MMOInventory.plugin.getConfig().getBoolean("disable-equiping-stacked-items", true);
-        } catch (Exception e) {
-            disableStacked = true; // 默认禁止堆叠
-        }
-        if (disableStacked && clickedItem.getAmount() > 1) return;
-
-        // 2) 判断是否为 MMOItems 的 ACCESSORY 类型，并检查特殊NBT
-        NBTItem nbtItem = NBTItem.get(clickedItem);
-        if (!isMMOItemsAccessory(nbtItem)) return;
-
-        // 未鉴定物品不可装备
-        if (nbtItem.hasTag("MMOITEMS_UNIDENTIFIED_ITEM")) return;
-
-        // 禁用交互的物品不可装备
-        if (nbtItem.getBoolean("MMOITEMS_DISABLE_INTERACTION")) return;
-
-        // 检查物品使用限制（灵魂绑定、等级、职业等）
-        net.Indyuce.mmoitems.api.player.PlayerData mmoPlayerData =
-                net.Indyuce.mmoitems.api.player.PlayerData.get(player);
-        if (mmoPlayerData != null && !mmoPlayerData.getRPG().canUse(nbtItem, true, true)) return;
-
-        // 3) 获取 MMOInventory PlayerData
-        PlayerData playerData;
-        try {
-            playerData = (PlayerData) MMOInventory.plugin.getDataManager().get(player);
-        } catch (Exception e) {
-            MMOItems.plugin.getLogger().log(Level.WARNING,
-                    "Failed to get MMOInventory PlayerData for " + player.getName() + ": " + e.getMessage());
-            return;
-        }
-        if (playerData == null) return;
-
-        // 4) 找一个合适的 ACCESSORY 槽位：优先空槽，否则允许交换
-        SlotPick pick = findAccessorySlot(playerData, clickedItem);
-        if (pick == null) return;
-
-        // 5) 发送 ItemEquipEvent（允许其他插件拦截）
-        ItemEquipEvent.EquipAction action = UtilityMethods.isAir(pick.previousItem)
-                ? ItemEquipEvent.EquipAction.EQUIP
-                : ItemEquipEvent.EquipAction.SWAP_ITEMS;
-
-        ItemEquipEvent equipEvent = new ItemEquipEvent(
-                player,
-                pick.inventory,
-                pick.previousItem,
-                clickedItem,
-                pick.slot,
-                action
-        );
-        Bukkit.getPluginManager().callEvent(equipEvent);
-        if (equipEvent.isCancelled()) {
-            // 装备被取消时，同时取消原始事件，物品保持原位
-            event.setCancelled(true);
-            return;
-        }
-
-        // 6) 执行装备操作
-        event.setCancelled(true);
-
-        ItemStack toEquip = clickedItem.clone();
-        toEquip.setAmount(1);
-
-        // 如果槽位有旧物品，先返还到背包
-        if (!UtilityMethods.isAir(pick.previousItem)) {
-            // 先清空槽位
-            pick.data.setItem(pick.slot, null);
-
-            // 返还旧物品到玩家背包，满则掉落
-            ItemStack prev = pick.previousItem.clone();
-            Collection<ItemStack> leftovers = player.getInventory().addItem(prev).values();
-            for (ItemStack left : leftovers) {
-                player.getWorld().dropItemNaturally(player.getLocation(), left);
-            }
-        }
-
-        // 装备新物品（会自动触发 InventoryUpdateEvent）
-        pick.data.setItem(pick.slot, toEquip);
-
-        // 7) 从玩家背包扣除点击的物品
-        if (clickedItem.getAmount() <= 1) {
-            event.setCurrentItem(null);
-        } else {
-            clickedItem.setAmount(clickedItem.getAmount() - 1);
-            event.setCurrentItem(clickedItem);
-        }
+        return;
     }
 
     private void handleAccessorySlotClick(InventoryClickEvent event, Player player) {
@@ -270,6 +165,46 @@ public class MMOInventoryClickEquipListener implements Listener {
             event.setCursor(pick.previousItem.clone());
         }
 
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMMOInventoryEquip(ItemEquipEvent event) {
+        final ItemStack item = event.getItem();
+        if (UtilityMethods.isAir(item)) return;
+
+        final NBTItem nbtItem = NBTItem.get(item);
+        if (!isMMOItemsAccessory(nbtItem)) return;
+
+        final Player player = event.getPlayer();
+        final net.Indyuce.mmoitems.api.player.PlayerData pdata = net.Indyuce.mmoitems.api.player.PlayerData.get(player);
+        if (pdata == null) return;
+
+        // 下一 tick 回写：避免被 MMOInventory 在当前点击逻辑末端覆盖
+        org.bukkit.Bukkit.getScheduler().runTask(MMOItems.plugin, () -> {
+            try {
+                final net.Indyuce.inventory.player.PlayerData mi = (net.Indyuce.inventory.player.PlayerData) MMOInventory.plugin.getDataManager().get(player);
+                if (mi == null) return;
+                final net.Indyuce.inventory.player.InventoryData data = mi.get(event.getInventory());
+                if (data == null || !event.hasSlot()) return;
+                final ItemStack equipped = data.getItem(event.getSlot());
+                if (UtilityMethods.isAir(equipped)) return;
+
+                final NBTItem equippedNbt = NBTItem.get(equipped);
+                if (!isMMOItemsAccessory(equippedNbt)) return;
+
+                final boolean bound = net.Indyuce.mmoitems.util.AutoBindUtil.applyAutoBindIfNeeded(pdata, equipped);
+                if (!bound) return;
+
+                // 写回 MMOInventory 真实存储
+                data.setItem(event.getSlot(), equipped);
+                MMOItems.plugin.getLogger().info(
+                        "调试: ItemEquipEvent 回写绑定结果，player=" + player.getName() + "，inv=" + event.getInventory().getId()
+                                + "，slot=" + event.getSlot().getIndex());
+            } catch (Throwable t) {
+                MMOItems.plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "调试: ItemEquipEvent 绑定回写失败: " + t.getMessage());
+            }
+        });
     }
 
     private boolean isMMOInventoryTopInventory(Inventory topInventory) {

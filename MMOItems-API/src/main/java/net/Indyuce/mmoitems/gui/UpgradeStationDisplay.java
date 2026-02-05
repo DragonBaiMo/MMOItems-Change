@@ -38,6 +38,10 @@ class UpgradeStationDisplay {
      */
     private static final Pattern NUMBER_PATTERN = Pattern.compile("([?:：]\\s*[+-]?)([\\d.]+)(%?)");
 
+    // ===== 预览缓存（避免重复解析强化石 NBT） =====
+    private ItemStack cachedStoneSnapshot;
+    private UpgradeData cachedStoneData;
+
     private final UpgradeStationGUI gui;
 
     UpgradeStationDisplay(UpgradeStationGUI gui) {
@@ -110,14 +114,15 @@ class UpgradeStationDisplay {
             return createPreviewItem(Material.STRUCTURE_VOID, gui.getMessage("preview-max-level", "&6&l已达最大等级"), lore);
         }
 
+        int targetLevel = resolveUpgradeTargetLevel(currentLevel, maxLevel);
         try {
-            return buildUpgradedPreviewItem(targetItem, data, currentLevel, maxLevel);
+            return buildUpgradedPreviewItem(targetItem, data, currentLevel, maxLevel, targetLevel);
         } catch (Exception e) {
-            return createSimplePreview(targetItem, data, currentLevel, maxLevel);
+            return createSimplePreview(targetItem, data, currentLevel, maxLevel, targetLevel);
         }
     }
 
-    private ItemStack buildUpgradedPreviewItem(ItemStack targetItem, UpgradeData data, int currentLevel, int maxLevel) {
+    private ItemStack buildUpgradedPreviewItem(ItemStack targetItem, UpgradeData data, int currentLevel, int maxLevel, int targetLevel) {
         VolatileMMOItem volatileItem = new VolatileMMOItem(NBTItem.get(targetItem));
         ItemMeta originalMeta = targetItem.getItemMeta();
         List<String> originalLore = (originalMeta != null && originalMeta.hasLore()) ? new ArrayList<>(originalMeta.getLore()) : new ArrayList<>();
@@ -130,7 +135,6 @@ class UpgradeStationDisplay {
             throw new RuntimeException("强化模板不存在: " + data.getTemplateName());
         }
 
-        int targetLevel = currentLevel + 1;
         template.upgradeTo(previewMMO, targetLevel);
 
         ItemStack preview = previewMMO.newBuilder().buildNBT().toItem();
@@ -218,6 +222,57 @@ class UpgradeStationDisplay {
         return result;
     }
 
+    private int resolveUpgradeTargetLevel(int currentLevel, int maxLevel) {
+        int upgradeAmount = 1;
+        boolean upgradeToMax = false;
+
+        UpgradeData stoneData = getCachedStoneData();
+        if (stoneData != null) {
+            upgradeAmount = stoneData.getUpgradeAmount();
+            upgradeToMax = stoneData.isUpgradeToMax();
+        }
+
+        if (upgradeToMax && maxLevel > 0) {
+            return maxLevel;
+        }
+
+        int targetLevel = currentLevel + upgradeAmount;
+        if (maxLevel > 0 && targetLevel > maxLevel) {
+            targetLevel = maxLevel;
+        }
+        return targetLevel;
+    }
+
+    private UpgradeData getCachedStoneData() {
+        ItemStack stoneItem = gui.getItemAt(gui.getSlotUpgradeStone());
+        if (stoneItem == null || stoneItem.getType() == Material.AIR) {
+            cachedStoneSnapshot = null;
+            cachedStoneData = null;
+            return null;
+        }
+
+        if (cachedStoneSnapshot != null && isSameStoneSnapshot(stoneItem, cachedStoneSnapshot)) {
+            return cachedStoneData;
+        }
+
+        cachedStoneSnapshot = stoneItem.clone();
+        cachedStoneData = extractStoneUpgradeData(stoneItem);
+        return cachedStoneData;
+    }
+
+    private boolean isSameStoneSnapshot(ItemStack current, ItemStack cached) {
+        return current.isSimilar(cached) && current.getAmount() == cached.getAmount();
+    }
+
+    private UpgradeData extractStoneUpgradeData(ItemStack stoneItem) {
+        NBTItem stoneNBT = NBTItem.get(stoneItem);
+        VolatileMMOItem stoneMmo = new VolatileMMOItem(stoneNBT);
+        if (stoneMmo.hasData(ItemStats.UPGRADE)) {
+            return (UpgradeData) stoneMmo.getData(ItemStats.UPGRADE);
+        }
+        return null;
+    }
+
     private String extractLineKey(String line) {
         if (line == null || line.isEmpty()) return null;
 
@@ -272,7 +327,7 @@ class UpgradeStationDisplay {
         return gui.color(result);
     }
 
-    private ItemStack createSimplePreview(ItemStack targetItem, UpgradeData data, int currentLevel, int maxLevel) {
+    private ItemStack createSimplePreview(ItemStack targetItem, UpgradeData data, int currentLevel, int maxLevel, int targetLevel) {
         List<String> lore = new ArrayList<>();
         lore.add("&7");
 
@@ -281,7 +336,7 @@ class UpgradeStationDisplay {
         lore.add("&7");
 
         lore.add(gui.getMessage("current-level", "&e当前等级: &f+{level}").replace("{level}", String.valueOf(currentLevel)));
-        lore.add(gui.getMessage("after-level", "&a强化后: &f+{level}").replace("{level}", String.valueOf(currentLevel + 1)));
+        lore.add(gui.getMessage("after-level", "&a强化后: &f+{level}").replace("{level}", String.valueOf(targetLevel)));
         if (maxLevel > 0) {
             lore.add(gui.getMessage("max-level", "&7最大等级: &f+{level}").replace("{level}", String.valueOf(maxLevel)));
         }
@@ -293,7 +348,7 @@ class UpgradeStationDisplay {
             lore.add(gui.getMessage("direct-effect", "&d? 直达石效果:"));
             lore.add(gui.getMessage("direct-chance", "&d  {chance}% 概率直接到 +{level}")
                     .replace("{chance}", String.format("%.0f", directChance))
-                    .replace("{level}", String.valueOf(currentLevel + 1 + directLevels)));
+                    .replace("{level}", String.valueOf(targetLevel + directLevels)));
         }
 
         lore.add("&7");
@@ -606,7 +661,7 @@ class UpgradeStationDisplay {
                 int maxLevel = data.getMax();
                 levelStr = String.valueOf(level);
                 maxLevelStr = String.valueOf(maxLevel);
-                nextLevelStr = String.valueOf(level + 1);
+                nextLevelStr = String.valueOf(resolveUpgradeTargetLevel(level, maxLevel));
                 templateName = data.getTemplateName() != null ? data.getTemplateName() : "";
 
                 // 惩罚信息

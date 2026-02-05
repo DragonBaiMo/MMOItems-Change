@@ -8,6 +8,7 @@ import net.Indyuce.mmoitems.api.item.build.MMOItemBuilder;
 import net.Indyuce.mmoitems.stat.data.random.RandomStatData;
 import net.Indyuce.mmoitems.stat.data.type.StatData;
 import net.Indyuce.mmoitems.util.MMOUtils;
+import net.Indyuce.mmoitems.util.MythicLibCompatibility;
 import io.lumine.mythic.lib.util.lang3.Validate;
 import org.bukkit.Color;
 import org.bukkit.Particle;
@@ -86,8 +87,8 @@ public class ParticleData implements StatData, RandomStatData<ParticleData> {
     }
 
     private ParticleInformation toMythicLib() {
-        if (color != null) return new ParticleInformation(particle, 1, 0, 0, color, 1);
-        else return new ParticleInformation(particle);
+        if (color != null) return MythicLibCompatibility.createParticle(particle, 1, 0, 0, color, 1);
+        return MythicLibCompatibility.createParticle(particle);
     }
 
     @NotNull

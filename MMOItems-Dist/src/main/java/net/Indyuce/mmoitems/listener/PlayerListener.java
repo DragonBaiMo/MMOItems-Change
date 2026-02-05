@@ -1,13 +1,20 @@
 package net.Indyuce.mmoitems.listener;
 
 import io.lumine.mythic.lib.MythicLib;
+import io.lumine.mythic.lib.UtilityMethods;
 import io.lumine.mythic.lib.api.event.PlayerAttackEvent;
 import io.lumine.mythic.lib.api.event.armorequip.ArmorEquipEvent;
 import io.lumine.mythic.lib.api.item.NBTItem;
 import io.lumine.mythic.lib.api.player.EquipmentSlot;
+import io.lumine.mythic.lib.damage.AttackMetadata;
+import io.lumine.mythic.lib.damage.DamageType;
+import io.lumine.mythic.lib.damage.MeleeAttackMetadata;
 import io.lumine.mythic.lib.damage.ProjectileAttackMetadata;
 import io.lumine.mythic.lib.entity.ProjectileMetadata;
 import io.lumine.mythic.lib.entity.ProjectileType;
+import io.lumine.mythic.lib.skill.SimpleSkill;
+import io.lumine.mythic.lib.skill.SkillMetadata;
+import io.lumine.mythic.lib.skill.handler.SkillHandler;
 import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.api.DeathItemsHandler;
 import net.Indyuce.mmoitems.api.Type;
@@ -26,6 +33,7 @@ import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -47,6 +55,7 @@ import java.util.logging.Level;
 public class PlayerListener implements Listener {
 
     private static final Map<UUID, BukkitTask> PENDING_LOGIN_REFRESH = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Boolean> SKILL_ATTACK_GUARD = ThreadLocal.withInitial(() -> false);
     private static final int LOGIN_REFRESH_MAX_ROUNDS = 6;
     private static final int LOGIN_REFRESH_SUCCESS_TARGET = 2;
     private static final long LOGIN_REFRESH_DELAY = 1L;
@@ -199,6 +208,9 @@ public class PlayerListener implements Listener {
             return;
 
         final PlayerData playerData = PlayerData.getOrNull(event.getPlayer());
+        if (playerData != null) {
+            net.Indyuce.mmoitems.util.AutoBindUtil.applyAutoBindIfNeeded(playerData, event.getNewArmorPiece());
+        }
         if (playerData != null && !playerData.getRPG().canUse(NBTItem.get(event.getNewArmorPiece()), true))
             event.setCancelled(true);
     }
@@ -248,6 +260,108 @@ public class PlayerListener implements Listener {
 
         // Apply MMOItems-specific effects
         applyPotionEffects(data, event.getEntity());
+    }
+
+    // Must run early enough so damage-modifying mechanics (like MythicLib 'damage')
+    // can affect the current AttackMetadata before it is applied.
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void triggerOnAttackForSkillDamage(PlayerAttackEvent event) {
+        final var damageMeta = event.getAttack().getDamage();
+        final boolean typedSkill = damageMeta.hasType(DamageType.SKILL);
+        final boolean typedWeapon = damageMeta.hasType(DamageType.WEAPON);
+        final boolean typedProjectile = damageMeta.hasType(DamageType.PROJECTILE);
+        final boolean projectileAttack = event.getAttack() instanceof ProjectileAttackMetadata;
+
+        // Requested: allow SKILL, WEAPON and projectile attacks.
+        if (event.getAttack() instanceof MeleeAttackMetadata) {
+            // Avoid double-triggering vanilla melee attacks (already handled by MMOItems).
+            // Only allow melee attacks that are explicitly SKILL-typed.
+            if (!typedSkill) {
+                return;
+            }
+        } else {
+            if (!typedSkill && !typedWeapon && !typedProjectile && !projectileAttack) {
+                return;
+            }
+        }
+
+        if (SKILL_ATTACK_GUARD.get()) return;
+
+        final Player player = event.getPlayer();
+        final PlayerData playerData = PlayerData.getOrNull(player);
+        if (playerData == null) return;
+
+        final ItemStack weaponUsed = player.getInventory().getItemInMainHand();
+        final NBTItem nbtItem = MythicLib.plugin.getVersion().getWrapper().getNBTItem(weaponUsed);
+        final Type itemType = Type.get(nbtItem);
+        if (itemType == null || itemType == Type.BLOCK) return;
+
+        final SkillHandler<?> onAttack = itemType.onAttack();
+        if (onAttack == null) {
+            return;
+        }
+        if (nbtItem.getBoolean("MMOITEMS_DISABLE_ATTACK_PASSIVE")) return;
+
+        final Weapon weapon = new Weapon(playerData, nbtItem);
+        if (!weapon.checkItemRequirements()) {
+            return;
+        }
+
+        try {
+            SKILL_ATTACK_GUARD.set(true);
+            // SkillMetadata already contains the target entity; MythicLib exposes it
+            // through reserved variables like <target>.
+            new SimpleSkill(onAttack).cast(SkillMetadata.of(event.getAttacker(), event.getEntity(), event.getAttack(), event));
+        } finally {
+            SKILL_ATTACK_GUARD.set(false);
+        }
+    }
+
+    /**
+     * MythicMobs (and potentially other plugins) can deal damage through fake
+     * Bukkit damage events. MythicLib intentionally ignores those events, which
+     * prevents {@link PlayerAttackEvent} from being fired.
+     * <p>
+     * However, MythicLib still registers an {@link AttackMetadata} on the target
+     * before applying damage (see MMODamageMechanic). We use that registry to
+     * trigger MMOItems type on-attack for those damage sources.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void triggerOnAttackForFakeDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof LivingEntity)) return;
+        if (!UtilityMethods.isFake(event)) return;
+        if (event.getDamage() <= 0) return;
+
+        final AttackMetadata attack = MythicLib.plugin.getDamage().getRegisteredAttackMetadata(event.getEntity());
+        if (attack == null || !attack.isPlayer()) return;
+        if (SKILL_ATTACK_GUARD.get()) return;
+
+        if (!(attack.getAttacker() instanceof io.lumine.mythic.lib.api.stat.provider.PlayerStatProvider)) return;
+
+        final var damageMeta = attack.getDamage();
+        final boolean typedSkill = damageMeta.hasType(DamageType.SKILL);
+        final boolean typedWeapon = damageMeta.hasType(DamageType.WEAPON);
+        final boolean typedProjectile = damageMeta.hasType(DamageType.PROJECTILE);
+        final boolean projectileAttack = attack instanceof ProjectileAttackMetadata;
+
+        // Keep the same allowlist behaviour as the PlayerAttackEvent listener.
+        if (attack instanceof MeleeAttackMetadata) {
+            if (!typedSkill) return;
+        } else {
+            if (!typedSkill && !typedWeapon && !typedProjectile && !projectileAttack) return;
+        }
+
+        // MythicLib ignores fake damage events and therefore never calls PlayerAttackEvent.
+        // We manually dispatch it so all MythicLib/MMOItems systems relying on it can react.
+        final PlayerAttackEvent called = new PlayerAttackEvent(event, attack);
+        org.bukkit.Bukkit.getPluginManager().callEvent(called);
+
+        // Mirror MythicLib AttackEventListener behaviour: apply potentially modified damage back.
+        if (called.isCancelled()) {
+            event.setCancelled(true);
+        } else {
+            event.setDamage(called.getDamage().getDamage());
+        }
     }
 
     private void applyPotionEffects(ProjectileMetadata proj, LivingEntity target) {

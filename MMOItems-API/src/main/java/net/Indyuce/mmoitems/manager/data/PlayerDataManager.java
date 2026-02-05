@@ -3,14 +3,14 @@ package net.Indyuce.mmoitems.manager.data;
 import io.lumine.mythic.lib.api.player.MMOPlayerData;
 import io.lumine.mythic.lib.data.DefaultOfflineDataHolder;
 import io.lumine.mythic.lib.data.SynchronizedDataManager;
-import io.lumine.mythic.lib.profile.DefaultProfileDataModule;
+import net.Indyuce.mmoitems.util.MythicLibCompatibility;
 import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.api.player.PlayerData;
 import org.jetbrains.annotations.NotNull;
 
 public class PlayerDataManager extends SynchronizedDataManager<PlayerData, DefaultOfflineDataHolder> {
     public PlayerDataManager(MMOItems plugin) {
-        super(plugin);
+        super((io.lumine.mythic.lib.module.MMOPlugin) plugin);
     }
 
     @Override
@@ -20,7 +20,7 @@ public class PlayerDataManager extends SynchronizedDataManager<PlayerData, Defau
 
     @Override
     public Object newProfileDataModule() {
-        return new DefaultProfileDataModule(getOwningPlugin());
+        return MythicLibCompatibility.createProfileDataModule(this);
     }
 
     @Override

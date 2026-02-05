@@ -8,6 +8,7 @@ import net.Indyuce.inventory.api.event.InventoryUpdateEvent;
 import net.Indyuce.inventory.inventory.Inventory;
 import net.Indyuce.inventory.inventory.slot.CustomSlot;
 import net.Indyuce.inventory.player.PlayerData;
+import net.Indyuce.mmoitems.MMOItems;
 import net.Indyuce.mmoitems.inventory.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -53,7 +54,12 @@ public class MMOInventorySupplier implements InventorySupplier, Listener {
         final Player player = event.getPlayerData().getPlayer();
         final net.Indyuce.mmoitems.api.player.PlayerData pdata = net.Indyuce.mmoitems.api.player.PlayerData.get(player);
         // 尝试先行绑定（若失败则不改变物品）
-        net.Indyuce.mmoitems.util.AutoBindUtil.applyAutoBindIfNeeded(pdata, equipped);
+        final boolean boundApplied = net.Indyuce.mmoitems.util.AutoBindUtil.applyAutoBindIfNeeded(pdata, equipped);
+        if (boundApplied) {
+            MMOItems.plugin.getLogger().info(
+                    "调试: preBind 触发自动绑定，key=" + guardKey(event) + "，player=" + player.getName());
+            FORCE_WRITEBACK.add(guardKey(event));
+        }
 
         final io.lumine.mythic.lib.api.item.NBTItem nbt = io.lumine.mythic.lib.api.item.NBTItem.get(equipped);
         if (net.Indyuce.mmoitems.api.Type.get(nbt) == null) return;
@@ -80,14 +86,8 @@ public class MMOInventorySupplier implements InventorySupplier, Listener {
 
         @Nullable
         public ItemUpdate watchAccessory(Inventory inventory, CustomSlot slot, @NotNull Optional<ItemStack> newItem) {
-            ItemStack stack = newItem.orElse(playerData.get().get(inventory).getItem(slot));
-            // 当为“事件驱动”的更新（newItem 存在）时，先尝试自动绑定
-            if (newItem.isPresent()) {
-                net.Indyuce.mmoitems.util.AutoBindUtil.applyAutoBindIfNeeded(
-                        net.Indyuce.mmoitems.api.player.PlayerData.get(player),
-                        stack
-                );
-            }
+            final ItemStack stored = playerData.get().get(inventory).getItem(slot);
+            final ItemStack stack = newItem.orElse(stored);
             // 若物品仍需要绑定但未绑定，则视作不可装备：
             // - 不进行装备注册（不施加属性/效果）；
             // - 若槽位原本有已注册物品，按移除处理，避免旧物品效果残留。
@@ -122,6 +122,7 @@ public class MMOInventorySupplier implements InventorySupplier, Listener {
         net.Indyuce.mmoitems.api.player.PlayerData.get(event.getPlayerData().getPlayer()).getInventory().watch(Watcher.class, watcher -> watcher.watchAccessory(event.getInventory(), event.getSlot(), optionalOf(equipped)));
     }
 
+
     // 在监听链末端（HIGHEST）回写：确保若 LOWEST 阶段完成了绑定和 NBT 更新，则把更新后的物品写回 MMOInventory 的真实存储
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void writeBackAfterBind(InventoryUpdateEvent event) {
@@ -133,27 +134,45 @@ public class MMOInventorySupplier implements InventorySupplier, Listener {
         if (net.Indyuce.mmoitems.api.Type.get(nbt) == null) return;
 
         // 生成重入键：playerUUID:inventoryId:slotIndex
-        final java.util.UUID playerId = event.getPlayerData().getPlayer().getUniqueId();
-        final int invId = event.getInventory().getIntegerId();
-        final int slotIdx = event.getSlot().getIndex();
-        final String guardKey = playerId + ":" + invId + ":" + slotIdx;
+        final String guardKey = guardKey(event);
 
         // 若已在本事件链中处理过，则跳过以避免递归
         if (!REENTRANCY_GUARD.add(guardKey)) return;
         try {
             // 仅当存储中的物品与事件中的不一致时回写
             final ItemStack stored = event.getPlayerData().get(event.getInventory()).getItem(event.getSlot());
-            if (!areItemsSame(stored, equipped)) {
+            if (FORCE_WRITEBACK.remove(guardKey)) {
+                MMOItems.plugin.getLogger().info(
+                        "调试: writeBack 强制回写，key=" + guardKey);
                 event.getPlayerData().get(event.getInventory()).setItem(event.getSlot(), equipped);
+            } else {
+                if (!areItemsSame(stored, equipped)) {
+                    MMOItems.plugin.getLogger().info(
+                            "调试: writeBack 差异回写，key=" + guardKey);
+                    event.getPlayerData().get(event.getInventory()).setItem(event.getSlot(), equipped);
+                }
             }
         } finally {
             REENTRANCY_GUARD.remove(guardKey);
         }
     }
 
+
     // 防止在 HIGHEST 阶段通过 setItem 回写时再次触发 InventoryUpdateEvent 而递归
     private static final Set<String> REENTRANCY_GUARD =
             java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    // 记录需要强制回写的槽位，确保自动绑定后的 NBT 持久化
+    private static final Set<String> FORCE_WRITEBACK =
+            java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+
+    private static String guardKey(InventoryUpdateEvent event) {
+        final java.util.UUID playerId = event.getPlayerData().getPlayer().getUniqueId();
+        final int invId = event.getInventory().getIntegerId();
+        final int slotIdx = event.getSlot().getIndex();
+        return playerId + ":" + invId + ":" + slotIdx;
+    }
 
     // 判等：避免不必要的回写触发二次事件
     private static boolean areItemsSame(org.bukkit.inventory.ItemStack a, org.bukkit.inventory.ItemStack b) {

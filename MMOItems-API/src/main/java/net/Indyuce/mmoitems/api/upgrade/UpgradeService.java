@@ -134,7 +134,8 @@ public class UpgradeService {
 
         // 4. 查找强化石（非免费模式）
         List<ItemStack> upgradeStones = new ArrayList<>();
-        UpgradeData consumableData = null;
+        // 优先使用 context 传入的 consumableData（GUI 模式已提前获取）
+        UpgradeData consumableData = context.getConsumableData();
         int requiredStones = context.getRequiredStoneCount();
 
         if (!context.isFreeMode()) {
@@ -144,11 +145,13 @@ public class UpgradeService {
             if (upgradeStones.size() < requiredStones) {
                 return UpgradeResult.error("背包中强化石不足，需要 " + requiredStones + " 个，当前 " + upgradeStones.size() + " 个");
             }
-            // 使用第一个强化石的成功率
-            NBTItem firstStoneNBT = NBTItem.get(upgradeStones.get(0));
-            VolatileMMOItem firstStone = new VolatileMMOItem(firstStoneNBT);
-            if (firstStone.hasData(ItemStats.UPGRADE)) {
-                consumableData = (UpgradeData) firstStone.getData(ItemStats.UPGRADE);
+            // 如果 context 没有传入 consumableData，从扫描到的第一个强化石获取
+            if (consumableData == null) {
+                NBTItem firstStoneNBT = NBTItem.get(upgradeStones.get(0));
+                VolatileMMOItem firstStone = new VolatileMMOItem(firstStoneNBT);
+                if (firstStone.hasData(ItemStats.UPGRADE)) {
+                    consumableData = (UpgradeData) firstStone.getData(ItemStats.UPGRADE);
+                }
             }
         }
 
@@ -161,7 +164,10 @@ public class UpgradeService {
         }
 
         // 5. 计算实际成功率（含辅料加成）
-        double actualSuccess = calculateActualSuccess(consumableData, targetData, context.getChanceModifier());
+        // 注意：GUI 模式下（freeMode = true）成功率通过 chanceModifier 传入，不从 consumableData 读取
+        // 背包模式下（freeMode = false）成功率从 consumableData 读取
+        UpgradeData successRateSource = context.isFreeMode() ? null : consumableData;
+        double actualSuccess = calculateActualSuccess(successRateSource, targetData, context.getChanceModifier());
         // 应用辅料成功率加成（累乘口径：actualSuccess = actualSuccess * (1 + bonus/100) ...）
         if (context.getAuxiliaryChanceBonus() > 0) {
             actualSuccess *= 1.0 + (context.getAuxiliaryChanceBonus() / 100.0);
@@ -210,7 +216,7 @@ public class UpgradeService {
                 NBTItem nbtItem = NBTItem.get(context.getTargetItemStack());
                 guaranteeManager.recordSuccess(nbtItem);
             }
-            return handleUpgradeSuccess(context, targetMMO, targetData, template, upgradeStones, originalLevel, guaranteeTriggered, runtimeSettings);
+            return handleUpgradeSuccess(context, targetMMO, targetData, template, upgradeStones, originalLevel, guaranteeTriggered, runtimeSettings, consumableData);
         } else {
             // 失败时增加保底计数
             if (guaranteeManager != null && guaranteeManager.isEnabled() && context.getTargetItemStack() != null) {
@@ -290,6 +296,7 @@ public class UpgradeService {
      * @param upgradeStones      强化石列表
      * @param originalLevel      原始等级
      * @param guaranteeTriggered 是否触发了保底
+     * @param consumableData     强化石的 UpgradeData（用于读取 upgradeAmount 等配置）
      * @return 强化结果
      */
     @NotNull
@@ -300,7 +307,8 @@ public class UpgradeService {
                                                        @NotNull List<ItemStack> upgradeStones,
                                                        int originalLevel,
                                                        boolean guaranteeTriggered,
-                                                       @NotNull UpgradeRuntimeSettings runtimeSettings) {
+                                                       @NotNull UpgradeRuntimeSettings runtimeSettings,
+                                                       @Nullable UpgradeData consumableData) {
         Player player = context.getPlayer();
 
         // 消耗强化石
@@ -324,9 +332,31 @@ public class UpgradeService {
             template.upgradeTo(targetMMO, targetLevel);
             newLevel = targetLevel;
         } else {
-            // 普通模式：+1
-            template.upgrade(targetMMO);
-            newLevel = originalLevel + 1;
+            // 普通模式：读取强化石的 upgradeAmount 配置（默认 +1）
+            // 优先检查是否配置了 upgrade-to-max（一次升满）
+            
+            if (consumableData != null && consumableData.isUpgradeToMax() && targetData.getMax() > 0) {
+                // 一次升满模式：直接升到目标物品的满级
+                template.upgradeTo(targetMMO, targetData.getMax());
+                newLevel = targetData.getMax();
+            } else {
+                // 计算升级数量
+                int upgradeAmount = (consumableData != null) ? consumableData.getUpgradeAmount() : 1;
+                int targetLevel = originalLevel + upgradeAmount;
+                
+                // 检查上限（非强制模式）
+                if (!context.isForceMode() && targetData.getMax() > 0 && targetLevel > targetData.getMax()) {
+                    targetLevel = targetData.getMax();
+                }
+                
+                // 执行升级
+                if (upgradeAmount == 1) {
+                    template.upgrade(targetMMO);
+                } else {
+                    template.upgradeTo(targetMMO, targetLevel);
+                }
+                newLevel = targetLevel;
+            }
 
             // ========== 直达石跳级效果（新增） ==========
             if (context.getAuxiliaryDirectUpChance() > 0 && context.getAuxiliaryDirectUpLevels() > 0) {
