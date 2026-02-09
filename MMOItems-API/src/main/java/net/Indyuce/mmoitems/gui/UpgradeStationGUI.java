@@ -697,24 +697,44 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
     }
 
     boolean isValidUpgradeStone(@Nullable ItemStack stone, @Nullable ItemStack target) {
-        if (stone == null || stone.getType() == Material.AIR) return false;
-        if (target == null || target.getType() == Material.AIR) return false;
+        return resolveMatchingStoneData(stone, target) != null;
+    }
+
+    /**
+     * 解析并校验“当前槽位强化石”是否可用于目标物品。
+     * <p>
+     * 返回 null 表示任一条件不满足（非消耗品、无 UPGRADE 数据、引用不匹配等）。
+     * </p>
+     */
+    @Nullable
+    UpgradeData resolveMatchingStoneData(@Nullable ItemStack target) {
+        ItemStack stone = getItemAt(slotUpgradeStone);
+        return resolveMatchingStoneData(stone, target);
+    }
+
+    /**
+     * 解析并校验指定强化石与目标物品是否匹配，匹配时返回强化石 UpgradeData。
+     */
+    @Nullable
+    UpgradeData resolveMatchingStoneData(@Nullable ItemStack stone, @Nullable ItemStack target) {
+        if (stone == null || stone.getType() == Material.AIR) return null;
+        if (target == null || target.getType() == Material.AIR) return null;
 
         NBTItem stoneNBT = NBTItem.get(stone);
         Type stoneType = Type.get(stoneNBT);
-        if (stoneType == null || !stoneType.corresponds(Type.CONSUMABLE)) return false;
-        if (!stoneNBT.hasTag(ItemStats.UPGRADE.getNBTPath())) return false;
+        if (stoneType == null || !stoneType.corresponds(Type.CONSUMABLE)) return null;
+        if (!stoneNBT.hasTag(ItemStats.UPGRADE.getNBTPath())) return null;
 
         NBTItem targetNBT = NBTItem.get(target);
         VolatileMMOItem targetMmo = new VolatileMMOItem(targetNBT);
-        if (!targetMmo.hasData(ItemStats.UPGRADE)) return false;
+        if (!targetMmo.hasData(ItemStats.UPGRADE)) return null;
         UpgradeData targetData = (UpgradeData) targetMmo.getData(ItemStats.UPGRADE);
 
         VolatileMMOItem stoneMmo = new VolatileMMOItem(stoneNBT);
-        if (!stoneMmo.hasData(ItemStats.UPGRADE)) return false;
+        if (!stoneMmo.hasData(ItemStats.UPGRADE)) return null;
         UpgradeData stoneData = (UpgradeData) stoneMmo.getData(ItemStats.UPGRADE);
 
-        return MMOUtils.checkReference(stoneData.getReference(), targetData.getReference());
+        return MMOUtils.checkReference(stoneData.getReference(), targetData.getReference()) ? stoneData : null;
     }
 
     // ===== 强化执行 =====
@@ -760,12 +780,29 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
 
         NBTItem targetNBT = NBTItem.get(targetItem);
         LiveMMOItem targetMMO = new LiveMMOItem(targetNBT);
+        if (!targetMMO.hasData(ItemStats.UPGRADE)) {
+            processing = false;
+            display.updateUpgradeButton();
+            playSound("sounds.deny");
+            player.sendMessage(color(getMessage("block-not-upgradable", "&c• 物品不可强化")));
+            return;
+        }
         UpgradeData targetData = (UpgradeData) targetMMO.getData(ItemStats.UPGRADE);
 
-        // 获取强化石的 UpgradeData（用于读取 upgradeAmount、upgradeToMax 等配置）
-        NBTItem stoneNBT = NBTItem.get(stoneItem);
-        VolatileMMOItem stoneMmo = new VolatileMMOItem(stoneNBT);
-        UpgradeData stoneData = stoneMmo.hasData(ItemStats.UPGRADE) ? (UpgradeData) stoneMmo.getData(ItemStats.UPGRADE) : null;
+        // 使用统一解析逻辑获取强化石 UpgradeData，避免展示层与执行层分叉
+        UpgradeData stoneData = resolveMatchingStoneData(stoneItem, targetItem);
+
+        // 防御：若石头在执行瞬间不可解析或不匹配，直接拒绝，不允许回落到 +1
+        if (stoneData == null) {
+            processing = false;
+            display.updateUpgradeButton();
+            playSound("sounds.deny");
+            player.sendMessage(color(getMessage("block-stone-mismatch", "&c• 强化石不匹配")));
+            logUpgradeTrace("REJECT_STONE_PARSE", targetData, null, targetData.getLevel(), targetData.getLevel(), null);
+            return;
+        }
+
+        logUpgradeTrace("PRE_EXECUTE", targetData, stoneData, targetData.getLevel(), targetData.getLevel(), null);
 
         // 重要：任何"会导致 UpgradeService 直接返回 error 的硬性校验"都必须在消耗材料前完成，避免 GUI 白白扣除材料
         DailyLimitManager dailyLimitManager = MMOItems.plugin.getUpgrades().getDailyLimitManager();
@@ -812,6 +849,10 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
                 .build();
 
         UpgradeResult result = UpgradeService.performUpgrade(context);
+
+        int beforeLevel = result.getPreviousLevel() >= 0 ? result.getPreviousLevel() : targetData.getLevel();
+        int afterLevel = result.getNewLevel() >= 0 ? result.getNewLevel() : targetData.getLevel();
+        logUpgradeTrace("POST_EXECUTE", targetData, stoneData, beforeLevel, afterLevel, result);
 
         // 错误：不应消耗材料
         if (result.isError()) {
@@ -1024,6 +1065,63 @@ public class UpgradeStationGUI implements InventoryHolder, Listener {
 
     String getMessage(String key, String defaultValue) {
         return getConfig().getString("messages." + key, defaultValue);
+    }
+
+    private boolean isUpgradeTraceEnabled() {
+        return getConfig().getBoolean("security.debug-upgrade-trace", false);
+    }
+
+    private int computeProjectedLevel(@NotNull UpgradeData targetData, @NotNull UpgradeData stoneData) {
+        int current = targetData.getLevel();
+        int max = targetData.getMax();
+
+        if (stoneData.isUpgradeToMax() && max > 0) {
+            return max;
+        }
+
+        int projected = current + stoneData.getUpgradeAmount();
+        if (max > 0 && projected > max) {
+            projected = max;
+        }
+        return projected;
+    }
+
+    private void logUpgradeTrace(@NotNull String phase,
+                                 @Nullable UpgradeData targetData,
+                                 @Nullable UpgradeData stoneData,
+                                 int beforeLevel,
+                                 int afterLevel,
+                                 @Nullable UpgradeResult result) {
+        if (!isUpgradeTraceEnabled()) {
+            return;
+        }
+
+        String targetRef = targetData != null ? String.valueOf(targetData.getReference()) : "null";
+        int targetMax = targetData != null ? targetData.getMax() : 0;
+
+        String stoneRef = stoneData != null ? String.valueOf(stoneData.getReference()) : "null";
+        int stoneAmount = stoneData != null ? stoneData.getUpgradeAmount() : -1;
+        boolean stoneToMax = stoneData != null && stoneData.isUpgradeToMax();
+
+        int projectedLevel = (targetData != null && stoneData != null) ? computeProjectedLevel(targetData, stoneData) : beforeLevel;
+
+        String status = result != null ? String.valueOf(result.getStatus()) : "null";
+        String penalty = result != null ? String.valueOf(result.getPenaltyResult()) : "null";
+        String intercepted = result != null ? String.valueOf(result.getInterceptedPenalty()) : "null";
+
+        MMOItems.plugin.getLogger().info("[UpgradeStationTrace] phase=" + phase
+                + " player=" + player.getName()
+                + " targetRef=" + targetRef
+                + " targetMax=" + targetMax
+                + " stoneRef=" + stoneRef
+                + " stoneAmount=" + stoneAmount
+                + " stoneToMax=" + stoneToMax
+                + " levelBefore=" + beforeLevel
+                + " projectedLevel=" + projectedLevel
+                + " levelAfter=" + afterLevel
+                + " resultStatus=" + status
+                + " penalty=" + penalty
+                + " intercepted=" + intercepted);
     }
 
     Material getMaterial(String path, Material defaultMaterial) {

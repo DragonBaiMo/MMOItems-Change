@@ -38,10 +38,6 @@ class UpgradeStationDisplay {
      */
     private static final Pattern NUMBER_PATTERN = Pattern.compile("([?:：]\\s*[+-]?)([\\d.]+)(%?)");
 
-    // ===== 预览缓存（避免重复解析强化石 NBT） =====
-    private ItemStack cachedStoneSnapshot;
-    private UpgradeData cachedStoneData;
-
     private final UpgradeStationGUI gui;
 
     UpgradeStationDisplay(UpgradeStationGUI gui) {
@@ -76,11 +72,61 @@ class UpgradeStationDisplay {
                 previewItem = createConfigItemWithPlaceholders("items.preview-not-upgradable", Material.BARRIER, "&c物品不可强化");
             } else {
                 UpgradeData data = (UpgradeData) mmoItem.getData(ItemStats.UPGRADE);
-                previewItem = createDetailedPreview(targetItem, data);
+                int currentLevel = data.getLevel();
+                int maxLevel = data.getMax();
+                boolean atMax = maxLevel > 0 && currentLevel >= maxLevel;
+
+                if (atMax) {
+                    // 已满级：显示满级提示
+                    previewItem = createMaxLevelPreview(targetItem, currentLevel);
+                } else {
+                    // 未满级：检查强化石状态
+                    ItemStack stoneItem = gui.getItemAt(gui.getSlotUpgradeStone());
+                    if (stoneItem == null || stoneItem.getType() == Material.AIR) {
+                        // 没放强化石：显示"请放入强化石"提示
+                        previewItem = createConfigItemWithPlaceholders("items.preview-need-stone", Material.BARRIER, "&c请放入强化石");
+                    } else if (!gui.isValidUpgradeStone(stoneItem, targetItem)) {
+                        // 强化石不匹配：显示"强化石不匹配"提示
+                        previewItem = createConfigItemWithPlaceholders("items.preview-stone-mismatch", Material.BARRIER, "&c强化石不匹配");
+                    } else {
+                        // 强化石匹配：生成升级后预览
+                        previewItem = createDetailedPreview(targetItem, data);
+                    }
+                }
             }
         }
 
         gui.setSlotItem(gui.getSlotPreview(), previewItem);
+    }
+
+    /**
+     * 创建已满级的预览物品
+     */
+    private ItemStack createMaxLevelPreview(ItemStack targetItem, int currentLevel) {
+        ItemStack base = gui.createConfigItem("items.preview-max-level", Material.STRUCTURE_VOID, "&6&l已达最大等级");
+        List<String> dynamicLore = new ArrayList<>();
+        dynamicLore.add("&7");
+        dynamicLore.add(gui.getMessage("item-name", "&f物品: {name}").replace("{name}", MMOUtils.getDisplayName(targetItem)));
+        dynamicLore.add("&7");
+        dynamicLore.add(gui.getMessage("current-level", "&e当前等级: &f+{level}").replace("{level}", String.valueOf(currentLevel)));
+        dynamicLore.add("&7");
+        dynamicLore.add(gui.getMessage("preview-max-reached", "&c已达到强化上限，无法继续强化"));
+        return appendDynamicLore(base, dynamicLore);
+    }
+
+    private ItemStack appendDynamicLore(ItemStack base, List<String> dynamicLoreRaw) {
+        ItemMeta meta = base.getItemMeta();
+        if (meta == null) {
+            return base;
+        }
+
+        List<String> mergedLore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
+        for (String line : dynamicLoreRaw) {
+            mergedLore.add(gui.color(line));
+        }
+        meta.setLore(mergedLore);
+        base.setItemMeta(meta);
+        return base;
     }
 
     private ItemStack createPreviewItem(Material material, String name, List<String> lore) {
@@ -98,27 +144,22 @@ class UpgradeStationDisplay {
         return item;
     }
 
+    /**
+     * 创建详细的升级后预览物品
+     * <p>
+     * 注意：此方法只应在强化石已验证匹配的情况下调用
+     * </p>
+     */
     private ItemStack createDetailedPreview(ItemStack targetItem, UpgradeData data) {
         int currentLevel = data.getLevel();
         int maxLevel = data.getMax();
-        boolean atMax = maxLevel > 0 && currentLevel >= maxLevel;
 
-        if (atMax) {
-            List<String> lore = new ArrayList<>();
-            lore.add("&7");
-            lore.add(gui.getMessage("item-name", "&f物品: {name}").replace("{name}", MMOUtils.getDisplayName(targetItem)));
-            lore.add("&7");
-            lore.add(gui.getMessage("current-level", "&e当前等级: &f+{level}").replace("{level}", String.valueOf(currentLevel)));
-            lore.add("&7");
-            lore.add("&c已达到强化上限，无法继续强化");
-            return createPreviewItem(Material.STRUCTURE_VOID, gui.getMessage("preview-max-level", "&6&l已达最大等级"), lore);
-        }
-
-        int targetLevel = resolveUpgradeTargetLevel(currentLevel, maxLevel);
+        // 计算目标等级（此时强化石已验证匹配，可以安全读取石头的 upgradeAmount/upgradeToMax）
+        int targetLevel = resolveUpgradeTargetLevel(targetItem, currentLevel, maxLevel);
         try {
             return buildUpgradedPreviewItem(targetItem, data, currentLevel, maxLevel, targetLevel);
         } catch (Exception e) {
-            return createSimplePreview(targetItem, data, currentLevel, maxLevel, targetLevel);
+            return createSimplePreview(targetItem, currentLevel, maxLevel, targetLevel);
         }
     }
 
@@ -222,55 +263,41 @@ class UpgradeStationDisplay {
         return result;
     }
 
-    private int resolveUpgradeTargetLevel(int currentLevel, int maxLevel) {
+    /**
+     * 计算升级目标等级
+     * <p>
+     * 注意：此方法只应在强化石已验证匹配的情况下调用。
+     * 内部会再次校验匹配作为防御性检查，若不匹配则回退到 currentLevel+1。
+     * </p>
+     *
+     * @param targetItem   目标物品（用于校验强化石匹配）
+     * @param currentLevel 当前等级
+     * @param maxLevel     最大等级（0 表示无上限）
+     * @return 目标等级
+     */
+    private int resolveUpgradeTargetLevel(ItemStack targetItem, int currentLevel, int maxLevel) {
         int upgradeAmount = 1;
         boolean upgradeToMax = false;
 
-        UpgradeData stoneData = getCachedStoneData();
+        // 仅当强化石可解析且匹配目标物品时，才读取其升级配置
+        UpgradeData stoneData = gui.resolveMatchingStoneData(targetItem);
         if (stoneData != null) {
             upgradeAmount = stoneData.getUpgradeAmount();
             upgradeToMax = stoneData.isUpgradeToMax();
         }
 
+        // 直升满级模式：仅当物品有明确上限时生效
         if (upgradeToMax && maxLevel > 0) {
             return maxLevel;
         }
+        // 注意：当 upgradeToMax=true 但 maxLevel=0（无上限）时，
+        // 忽略直升满级请求，按普通升级幅度处理
 
         int targetLevel = currentLevel + upgradeAmount;
         if (maxLevel > 0 && targetLevel > maxLevel) {
             targetLevel = maxLevel;
         }
         return targetLevel;
-    }
-
-    private UpgradeData getCachedStoneData() {
-        ItemStack stoneItem = gui.getItemAt(gui.getSlotUpgradeStone());
-        if (stoneItem == null || stoneItem.getType() == Material.AIR) {
-            cachedStoneSnapshot = null;
-            cachedStoneData = null;
-            return null;
-        }
-
-        if (cachedStoneSnapshot != null && isSameStoneSnapshot(stoneItem, cachedStoneSnapshot)) {
-            return cachedStoneData;
-        }
-
-        cachedStoneSnapshot = stoneItem.clone();
-        cachedStoneData = extractStoneUpgradeData(stoneItem);
-        return cachedStoneData;
-    }
-
-    private boolean isSameStoneSnapshot(ItemStack current, ItemStack cached) {
-        return current.isSimilar(cached) && current.getAmount() == cached.getAmount();
-    }
-
-    private UpgradeData extractStoneUpgradeData(ItemStack stoneItem) {
-        NBTItem stoneNBT = NBTItem.get(stoneItem);
-        VolatileMMOItem stoneMmo = new VolatileMMOItem(stoneNBT);
-        if (stoneMmo.hasData(ItemStats.UPGRADE)) {
-            return (UpgradeData) stoneMmo.getData(ItemStats.UPGRADE);
-        }
-        return null;
     }
 
     private String extractLineKey(String line) {
@@ -327,7 +354,7 @@ class UpgradeStationDisplay {
         return gui.color(result);
     }
 
-    private ItemStack createSimplePreview(ItemStack targetItem, UpgradeData data, int currentLevel, int maxLevel, int targetLevel) {
+    private ItemStack createSimplePreview(ItemStack targetItem, int currentLevel, int maxLevel, int targetLevel) {
         List<String> lore = new ArrayList<>();
         lore.add("&7");
 
@@ -352,9 +379,10 @@ class UpgradeStationDisplay {
         }
 
         lore.add("&7");
-        lore.add("&8(无法生成完整预览)");
+        lore.add(gui.getMessage("preview-fallback", "&8(无法生成完整预览)"));
 
-        return createPreviewItem(Material.NETHER_STAR, "&e&l强化预览", lore);
+        ItemStack base = gui.createConfigItem("items.preview-normal", Material.NETHER_STAR, "&e&l强化预览");
+        return appendDynamicLore(base, lore);
     }
 
     private void updateProgressBar() {
@@ -490,7 +518,7 @@ class UpgradeStationDisplay {
         ItemStack item = gui.createConfigItem("items.info-panel", Material.BOOK, "&e&l强化信息");
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            List<String> lore = new ArrayList<>();
+            List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
 
             DailyLimitManager dlm = MMOItems.plugin.getUpgrades().getDailyLimitManager();
             if (dlm != null && dlm.isEnabled()) {
@@ -661,7 +689,8 @@ class UpgradeStationDisplay {
                 int maxLevel = data.getMax();
                 levelStr = String.valueOf(level);
                 maxLevelStr = String.valueOf(maxLevel);
-                nextLevelStr = String.valueOf(resolveUpgradeTargetLevel(level, maxLevel));
+                // 只有强化石匹配时才使用石头的升级幅度，否则回退到 level+1
+                nextLevelStr = String.valueOf(resolveUpgradeTargetLevel(targetItem, level, maxLevel));
                 templateName = data.getTemplateName() != null ? data.getTemplateName() : "";
 
                 // 惩罚信息

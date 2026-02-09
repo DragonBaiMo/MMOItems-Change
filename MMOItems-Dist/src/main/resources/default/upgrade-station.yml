@@ -126,6 +126,28 @@ items:
     material: STRUCTURE_VOID
     name: "&6&l已达最大等级"
 
+  preview-need-stone:
+    material: BARRIER
+    name: "&c请放入强化石"
+    lore:
+      - "&7"
+      - "&7放入匹配的强化石后"
+      - "&7才能生成强化预览"
+
+  preview-stone-mismatch:
+    material: BARRIER
+    name: "&c强化石不匹配"
+    lore:
+      - "&7"
+      - "&c当前强化石无法用于此物品"
+      - "&7请更换匹配的强化石"
+
+  preview-not-upgradable:
+    material: BARRIER
+    name: "&c物品不可强化"
+    lore:
+      - "&7该物品没有强化属性"
+
   close-button:
     material: BARRIER
     name: "&c&l关闭"
@@ -210,6 +232,20 @@ messages:
   upgrade-fail-protected-break: "&a强化失败，保护已生效（拦截碎裂）：&f{reason}"
   upgrade-fail-protected-downgrade: "&a强化失败，保护已生效（拦截掉级）：&f{reason}"
   upgrade-fail-protected-destroy: "&a强化失败，保护已生效（拦截销毁）：&f{reason}"
+  # 经济消耗
+  economy-title: "&6✦ 强化费用:"
+  economy-cost: "  &6消耗: &f{cost}"
+  economy-balance: "  &7余额: {color}{balance}"
+  # 全局加成
+  global-bonus-title: "&d✦ 全局加成:"
+  global-bonus-value: "  &d成功率 +{rate}%"
+  # 阻断原因
+  block-no-item: "&c• 请放入待强化物品"
+  block-not-mmoitem: "&c• 物品不是 MMOItems 物品"
+  block-not-upgradable: "&c• 物品不可强化"
+  block-max-level: "&c• 已达最大等级"
+  block-no-stone: "&c• 请放入强化石"
+  block-stone-mismatch: "&c• 强化石不匹配"
 
 # 属性变化标记
 change-marker:
@@ -219,12 +255,6 @@ change-marker:
   negative-color: "&c"
   decimal-places: 1
   min-change: 0.01
-  block-no-item: "&c• 请放入待强化物品"
-  block-not-mmoitem: "&c• 物品不是 MMOItems 物品"
-  block-not-upgradable: "&c• 物品不可强化"
-  block-max-level: "&c• 已达最大等级"
-  block-no-stone: "&c• 请放入强化石"
-  block-stone-mismatch: "&c• 强化石不匹配"
 
 # 音效配置
 sounds:
@@ -245,3 +275,5 @@ security:
   block-shift-click: true
   block-number-key: true
   block-drag: false
+  # 调试开关：输出强化执行链路日志（用于排查间歇性等级异常）
+  debug-upgrade-trace: false
