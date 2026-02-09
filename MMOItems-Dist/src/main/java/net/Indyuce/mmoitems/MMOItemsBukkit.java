@@ -20,6 +20,7 @@ public class MMOItemsBukkit {
         Bukkit.getPluginManager().registerEvents(new ItemUse(), plugin);
         Bukkit.getPluginManager().registerEvents(new ItemListener(), plugin);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(), plugin);
+        Bukkit.getPluginManager().registerEvents(new InventoryTimerListener(), plugin);
         Bukkit.getPluginManager().registerEvents(new CustomSoundListener(), plugin);
         Bukkit.getPluginManager().registerEvents(new DurabilityListener(), plugin);
         Bukkit.getPluginManager().registerEvents(new DisableInteractions(), plugin);

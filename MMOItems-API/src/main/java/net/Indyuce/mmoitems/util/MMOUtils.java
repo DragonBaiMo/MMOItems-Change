@@ -297,6 +297,12 @@ public class MMOUtils {
                 return TriggerType.ATTACK;
             case "WHEN_HIT":
                 return TriggerType.DAMAGED;
+            case "WEAPON_CRIT":
+                return TriggerType.valueOf("ON_CRIT_WEAPON");
+            case "SKILL_CRIT":
+                return TriggerType.valueOf("ON_CRIT_SKILL");
+            case "INVENTORY_TIMER":
+                return TriggerType.valueOf("TIMER_INVENTORY");
             default:
                 return TriggerType.valueOf(name);
         }

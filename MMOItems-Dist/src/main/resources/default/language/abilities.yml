@@ -6,6 +6,7 @@ cast-mode:
   shift-left-click: Shift Left Click
   arrow-tick: Arrow Tick
   timer: Timer
+  timer-inventory: Timer Inventory
   death: Death
   trident-land: Trident Land
   arrow-land: Arrow Land
@@ -13,6 +14,8 @@ cast-mode:
   kill-entity: Kill Entity
   right-click: Right Click
   attack: Attack
+  on-crit-weapon: On Crit Weapon
+  on-crit-skill: On Crit Skill
   arrow-hit: Arrow Hit
   login: Login
   api: Api
